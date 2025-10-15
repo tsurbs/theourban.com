@@ -1,12 +1,11 @@
 <script lang="ts">
   export let data: {
-    initialData: { message: string };
     streamed: {
-      completion: Promise<string>;
+      backend_isalive: Promise<string>;
     };
   };
   export let question = "Hello?";
-
+  const backend_url = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
   let lines: string[] = [];
   let loading = false;
@@ -20,7 +19,7 @@
     try {
       const query = new URLSearchParams({ question });
       const streamedAnswer = fetch(
-        "http://localhost:8000/chat?" + query.toString(),
+        `${backend_url}/chat?` + query.toString(),
         { method: "POST" }
       ); // Awaited before initial render
 
@@ -61,7 +60,13 @@
   }
 </script>
 
-<h1>Initial Data: {data.initialData.message}</h1>
+<div class="relative top-[25vh] left-[25vh]">
+  <p>Hi, I'm</p>
+  <h1 style="color: var(--color-accent); font-size: 3rem; font-weight: bold;">Theo Urban</h1>
+  <p>... but if you’re here, you probably know that....</p>
+  <p>So, why don’t you ask what you want to know?</p>
+</div>
+<h1>Initial Data: {question}</h1>
 <!-- on submit set question to the query value in the form -->
 <form
   on:submit|preventDefault={(e) => {
@@ -74,6 +79,13 @@
   {#if loading}
 	<button type="button" on:click={stopStream}>Stop</button>
   {/if}
+  {#await data.streamed.backend_isalive}
+    <p>Backend is loading</p>
+    {:catch err}
+	  <p style="color: red;">Backend is not reachable</p>
+    {:then backend_status}
+	<p>Backend status: {backend_status}</p>
+  {/await}
 </form>
 
 <!-- display streamed data -->

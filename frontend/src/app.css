@@ -1,1 +1,7 @@
 @import 'tailwindcss';
+
+/* define custom colors */
+:root {
+  --color-background: #E4E4E4;
+  --color-accent: #CC785C;
+}
