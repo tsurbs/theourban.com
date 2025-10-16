@@ -8,53 +8,53 @@
     "title": "ScottyLabs",
     "tags": ["AI"],
     "priority": "1",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/scottylabs_gradlogo.png"
 },
 {
     "title": "CMUMaps",
     "tags": ["AI", "CS"],
     "priority": "2",
-    "cover_image":  "./pages/theo_2.png"
+    "cover_image":  "./pages/cmumaps.png"
 },
 {
     "title": "Capital One",
     "tags": ["CS"],
     "priority": "3",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/cap1.png"
 },
 {
     "title": "Lazarus AI",
     "tags": ["Misc."],
     "priority": "4",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/lazarus.png"
 },
 {
     "title": "O-Quest",
     "tags": ["Misc."],
     "priority": "5",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/oquest.png"
 },
 {
-    "title": "Labrador",
+    "title": "15-281 TA",
     "tags": ["Misc."],
     "priority": "6",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/281.png"
 },
 {
     "title": "Running",
     "tags": ["Misc."],
     "priority": "7",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/running.png"
 },
 {
     "title": "Trellis Problem",
     "tags": ["Misc."],
     "priority": "8",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/trellis.png"
 },
 {
     "title": "Style Transfer",
     "tags": ["Misc."],
     "priority": "9",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/aladin.png"
 }]

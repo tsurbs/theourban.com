@@ -42,7 +42,7 @@
   </script>
 {/if}
 
-<div style="height: 100vh;">
+<div style="height: 100vh; margin: 0;">
 <img class="logo fade-in-element not-visible" src={logo} alt="logo" />
 <div style="display: flex; justify-content: center; align-items: center;">
   <div class="introduction">
@@ -58,7 +58,7 @@
 </div>
 </div>
 
-<div style="top: 100vh; height: 100vh; margin: auto;">
+<div style="top: 100vh; height: 100vh; margin: 0;">
   <div class="about-me-initial">
     <div class="about-me-text">
       I’m an <span class="accented-text">AI</span> Major (with <span class="accented-text">Math & LTI minors</span>) @ <span class="accented-text">Carnegie Mellon</span>.  I run <span class="accented-text">ScottyLabs</span>, the premier Software Engineering Club at CMU, and am a Former <span class="accented-text">15-281 Head TA</span>.  I'm passionate about the power of the internet to solve problems, and endlessly intrigued by <span class="accented-text">AI, CS theory, math, and society</span>.
@@ -82,7 +82,7 @@
     <!-- Content items would go here, filtered by sectionFilter -->
     {#each pages.filter(page => sectionFilter === 'All' || page.tags.includes(sectionFilter)) as page}
       <div class="content-item">
-        <img src={`/src/lib/assets/${page.cover_image.replace("./", "")}`} alt={page.title} style="width: 15vh; justify-self:center; border-radius: 10px;" /><h2 style="justify-self: center; font-weight:400;">{page.title}</h2>
+        <img src={`/src/lib/assets/${page.cover_image.replace("./", "")}`} alt={page.title} style="height:150px; aspect-ratio: 1 / 1; object-fit: contain; justify-self:center; border-radius: 10px;" /> <div class="vbar" ></div> <h2 style="justify-self: center; font-weight:400;">{page.title}</h2>
       </div>
     {/each}
   </div>
