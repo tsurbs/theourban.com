@@ -1,0 +1,25 @@
+/* add hsla(33, 46%, 60%, 1) as the secondary color */
+:root {
+    --background: hsla(0, 0%, 97%, 1);
+    --primary: hsla(215, 33%, 26%, 1);
+    --secondary: hsla(33, 46%, 60%, 1);
+    --content-font: "Aptos Narrow", sans-serif;
+    --branding-font: "Young Serif", serif;
+
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+    background: var(--background);
+}
+
+.bounce2 {
+  animation: bounce2 4s ease infinite;
+}
+@keyframes bounce2 {
+	0%, 10%, 25%, 40%, 100% {transform: translateY(0);}
+	20% {transform: translateY(-30px);}
+	30% {transform: translateY(-15px);}
+}
+

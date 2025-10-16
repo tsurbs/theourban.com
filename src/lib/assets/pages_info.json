@@ -1,0 +1,60 @@
+[{
+    "title": "About me",
+    "tags": ["AI", "CS", "Misc."],
+    "priority": "0",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "ScottyLabs",
+    "tags": ["AI"],
+    "priority": "1",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "CMUMaps",
+    "tags": ["AI", "CS"],
+    "priority": "2",
+    "cover_image":  "./pages/theo_2.png"
+},
+{
+    "title": "Capital One",
+    "tags": ["CS"],
+    "priority": "3",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "Lazarus AI",
+    "tags": ["Misc."],
+    "priority": "4",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "O-Quest",
+    "tags": ["Misc."],
+    "priority": "5",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "Labrador",
+    "tags": ["Misc."],
+    "priority": "6",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "Running",
+    "tags": ["Misc."],
+    "priority": "7",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "Trellis Problem",
+    "tags": ["Misc."],
+    "priority": "8",
+    "cover_image": "./pages/theo_2.png"
+},
+{
+    "title": "Style Transfer",
+    "tags": ["Misc."],
+    "priority": "9",
+    "cover_image": "./pages/theo_2.png"
+}]
