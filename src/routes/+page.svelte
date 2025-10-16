@@ -81,9 +81,9 @@
   <div class="content-container">
     <!-- Content items would go here, filtered by sectionFilter -->
     {#each pages.filter(page => sectionFilter === 'All' || page.tags.includes(sectionFilter)) as page}
-      <div class="content-item">
+      <button class="content-item" onclick={() =>window.location.href='/writings/' + page.slug}>
         <img src={`/src/lib/assets/${page.cover_image.replace("./", "")}`} alt={page.title} style="height:150px; aspect-ratio: 1 / 1; object-fit: contain; justify-self:center; border-radius: 10px;" /> <div class="vbar" ></div> <h2 style="justify-self: center; font-weight:400;">{page.title}</h2>
-      </div>
+      </button>
     {/each}
   </div>
 

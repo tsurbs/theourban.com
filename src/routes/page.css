@@ -75,9 +75,9 @@
   opacity: 0;
   transform: translateY(-100px);
 }
-
+/* if it is mobile, switch to two rows */
 .about-me-initial {
-    padding-top: 20vh;
+    margin-top: 20vh;
     width: 60vw;
     font-size: 30px;
     grid-gap: 20px;
@@ -85,6 +85,26 @@
     grid-template-columns: 4fr 1fr;
     margin-left: auto;
     margin-right: auto;
+}
+@media (max-width: 768px) {
+    .about-me-initial {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        padding-top: 10vh;
+    }
+    .about-me-link-box {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        grid-gap: 5px;
+        justify-self: center;
+        padding: 10px;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 0 4px 4px rgba(0, 0, 0, 0.25);
+        aspect-ratio: auto;
+        width: 20vw;
+    }
+    
 }
 
 .about-me-text {
@@ -94,7 +114,6 @@
     font-style: normal;
     font-weight: 400;
     line-height: 1.5;
-    padding: 20px;
     box-shadow: 0 0 4px 4px rgba(0, 0, 0, 0.25);
     padding: 40px;
     background: #fff;
@@ -102,6 +121,7 @@
 }
 
 .about-me-link-box { 
+    width: 10vw;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
@@ -196,6 +216,22 @@
 
 
 .content-item {
+    /* reject button styling */
+    /* Remove default button appearance */
+    -webkit-appearance: none; /* For WebKit browsers (Chrome, Safari) */
+    -moz-appearance: none;    /* For Mozilla browsers (Firefox) */
+    appearance: none;         /* Standard property */
+
+    /* Remove default styling */
+    background: none;         /* No background color */
+    border: none;             /* No border */
+    padding: 0;               /* No padding */
+    margin: 0;                /* No margin */
+    font: inherit;            /* Inherit font styles from parent */
+    color: inherit;           /* Inherit text color from parent */
+    cursor: pointer;          /* Maintain pointer cursor for interactivity if desired */
+
+    /* begin normal styling */
     background: #fff;
     box-shadow: 0 0 4px 4px rgba(0, 0, 0, 0.25);
     border-radius: 20px;
@@ -205,7 +241,6 @@
     align-items: center;
     font-family: var(--content-font), sans-serif;
     font-weight: 400;
-    height: 150px;
 }
 
 .content-item:hover {

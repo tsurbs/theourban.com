@@ -2,59 +2,79 @@
     "title": "About me",
     "tags": ["AI", "CS", "Misc."],
     "priority": "0",
-    "cover_image": "./pages/theo_2.png"
+    "cover_image": "./pages/theo_2.png",
+    "slug": "about-me",
+    "content": "<p>This is the about me page content.</p>"
 },
 {
     "title": "ScottyLabs",
     "tags": ["AI"],
     "priority": "1",
-    "cover_image": "./pages/scottylabs_gradlogo.png"
+    "cover_image": "./pages/scottylabs_gradlogo.png",
+    "slug": "scottylabs",
+    "content": "<p>This is the ScottyLabs page content.</p>"
 },
 {
     "title": "CMUMaps",
     "tags": ["AI", "CS"],
     "priority": "2",
-    "cover_image":  "./pages/cmumaps.png"
+    "cover_image":  "./pages/cmumaps.png",
+    "slug": "cmumaps",
+    "content": "<p>This is the CMUMaps page content.</p>"
 },
 {
     "title": "Capital One",
     "tags": ["CS"],
     "priority": "3",
-    "cover_image": "./pages/cap1.png"
+    "cover_image": "./pages/cap1.png",
+    "slug": "capital-one",
+    "content": "<p>This is the Capital One page content.</p>"
 },
 {
     "title": "Lazarus AI",
     "tags": ["Misc."],
     "priority": "4",
-    "cover_image": "./pages/lazarus.png"
+    "cover_image": "./pages/lazarus.png",
+    "slug": "lazarus-ai",
+    "content": "<p>This is the Lazarus AI page content.</p>"
 },
 {
     "title": "O-Quest",
     "tags": ["Misc."],
     "priority": "5",
-    "cover_image": "./pages/oquest.png"
+    "cover_image": "./pages/oquest.png",
+    "slug": "o-quest",
+    "content": "<p>This is the O-Quest page content.</p>"
 },
 {
     "title": "15-281 TA",
     "tags": ["Misc."],
     "priority": "6",
-    "cover_image": "./pages/281.png"
+    "cover_image": "./pages/281.png",
+    "slug": "15-281-ta",
+    "content": "<p>This is the 15-281 TA page content.</p>"
 },
 {
     "title": "Running",
     "tags": ["Misc."],
     "priority": "7",
-    "cover_image": "./pages/running.png"
+    "cover_image": "./pages/running.png",
+    "slug": "running",
+    "content": "<p>This is the Running page content.</p>"
 },
 {
     "title": "Trellis Problem",
     "tags": ["Misc."],
     "priority": "8",
-    "cover_image": "./pages/trellis.png"
+    "cover_image": "./pages/trellis.png",
+    "slug": "trellis-problem",
+    "content": "<p>This is the Trellis Problem page content.</p>"
 },
 {
     "title": "Style Transfer",
     "tags": ["Misc."],
     "priority": "9",
-    "cover_image": "./pages/aladin.png"
+    "cover_image": "./pages/aladin.png",
+    "slug": "style-transfer",
+    "content": "<p>This is the Style Transfer page content.</p>"
 }]
