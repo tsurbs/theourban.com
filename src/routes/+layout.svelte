@@ -32,13 +32,14 @@
 				siteState.styleGuide = styleData.styleGuide;
 			}
 
-			// 2. Generate the ENTIRE SPA with feedback history
+			// 2. Generate the ENTIRE SPA with feedback history and current state
 			const uiRes = await fetch("/api/generate-ui", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					styleGuide: siteState.styleGuide,
 					feedbackHistory: siteState.feedbackHistory,
+					oldHtml: siteState.generatedHtml,
 				}),
 				signal: abortController.signal,
 			});

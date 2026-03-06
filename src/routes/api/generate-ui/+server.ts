@@ -12,10 +12,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	let styleGuide = null;
 	let feedbackHistory: string[] = [];
+	let oldHtml = '';
 	try {
 		const body = await request.json();
 		styleGuide = body.styleGuide || null;
 		feedbackHistory = body.feedbackHistory || [];
+		oldHtml = body.oldHtml || '';
 	} catch {
 		// Ignore bad JSON
 	}
@@ -29,28 +31,36 @@ export const POST: RequestHandler = async ({ request }) => {
 			},
 			body: JSON.stringify({
 				// Using the requested Gemini Flash Lite preview model
-				model: 'openai/gpt-oss-safeguard-20b:nitro',
+				model: 'google/gemini-3.1-flash-lite-preview',
+				reasoning: {
+					"max_tokens": 0,
+				},
 				messages: [
 					{
 						role: 'system',
 						content: `You are an expert UI developer. Create a beautiful, modern, single HTML file (with embedded CSS and JS) representing a complete, multi-page personal portfolio website as a Single Page Application (SPA).
 						
-CRITICAL INSTRUCTION:
+INSTRUCTION:
 Generate the layout and content for EVERY page provided in the content data below.
 The user should be able to navigate between all pages (About, Projects, etc.) without any page reloads.
 
 Here is the FULL site data: ${JSON.stringify(content, null, 2)}
-${styleGuide ? `CRITICAL STYLE GUIDE: Follow these branding rules strictly: ${JSON.stringify(styleGuide, null, 2)}` : ''}
-${feedbackHistory.length > 0 ? `USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
+${styleGuide ? `STYLE GUIDE: Follow these branding rules strictly: ${JSON.stringify(styleGuide, null, 2)}` : ''}
+${oldHtml ? `CURRENT UI (Reference this for edits): [HTML provided below]` : ''}
+${feedbackHistory.length > 0 ? `CRITICAL USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
 
-CRITICAL UI REQUIREMENTS:
+UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
 2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
 3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
 4. All images, fonts, and assets must be referenced using absolute paths provided in the content data (e.g., /pages/image.png). These are served from the static directory.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
 6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.`
-					}
+					},
+					...(oldHtml ? [{
+						role: 'user',
+						content: `Here is the current HTML code of the site for your reference: \n\n${oldHtml}`
+					}] : [])
 				]
 			})
 		});
