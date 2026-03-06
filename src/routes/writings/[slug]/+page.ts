@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import info from '$lib/assets/pages_info.json';
+import info from '$lib/assets/content.json';
 
 export const load: PageLoad = ({ params }) => {
-	const post = info.find((p) => p.slug === params.slug);
+	const post = info.pages.find((p) => p.slug === params.slug);
 	if (post) {
 		return {
 			title: post.title,
-            content: post.content,
+			content: post.content,
 		};
 	}
 
