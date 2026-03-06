@@ -6,6 +6,36 @@ import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
+function createMailMerge(obj: any, prefix: string = 'CONTENT_VAR_'): { template: any, mapping: Record<string, string> } {
+	const mapping: Record<string, string> = {};
+	let counter = 0;
+
+	function walk(val: any): any {
+		if (typeof val === 'string') {
+			const isLikelyPath = val.startsWith('/') || val.startsWith('http');
+			if (!isLikelyPath && val.length > 0) {
+				const id = `${prefix}${counter++}`;
+				mapping[id] = val;
+				return `[[${id}]]`;
+			}
+			return val;
+		}
+		if (Array.isArray(val)) {
+			return val.map(walk);
+		}
+		if (val !== null && typeof val === 'object') {
+			const newObj: any = {};
+			for (const key in val) {
+				newObj[key] = walk(val[key]);
+			}
+			return newObj;
+		}
+		return val;
+	}
+
+	return { template: walk(obj), mapping };
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const API_KEY = env.OPENROUTER_API_KEY;
 
@@ -27,6 +57,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Ignore bad JSON
 	}
 
+	const { template, mapping } = createMailMerge(content);
+
 	try {
 		const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
 			method: 'POST',
@@ -35,7 +67,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				// Using the requested Gemini Flash Lite preview model
 				model: 'google/gemini-3.1-flash-lite-preview',
 				reasoning: {
 					"max_tokens": 0,
@@ -46,10 +77,15 @@ export const POST: RequestHandler = async ({ request }) => {
 						content: `You are an expert UI developer. Create a beautiful, modern, single HTML file (with embedded CSS and JS) representing a complete, multi-page personal portfolio website as a Single Page Application (SPA).
 						
 INSTRUCTION:
-Generate the layout and content for EVERY page provided in the content data below.
-The user should be able to navigate between all pages (About, Projects, etc.) without any page reloads.
+Generate the layout using the provided JSON template. 
+CRITICAL: The text content in the JSON has been replaced with placeholders like [[CONTENT_VAR_0]]. 
+You MUST use these placeholders EXACTLY as they appear in the JSON template below whenever you need to render that specific piece of content. 
+DO NOT invent text, do not fix "typos" (you can't see the text anyway), and DO NOT omit placeholders. 
 
-Here is the FULL site data: ${JSON.stringify(content, null, 2)}
+Placeholders represent the actual user content that will be merged in after you generate the UI.
+
+Here is the SITE DATA TEMPLATE: ${JSON.stringify(template, null, 2)}
+
 ${styleGuide ? `STYLE GUIDE: Follow these branding rules strictly: ${JSON.stringify(styleGuide, null, 2)}` : ''}
 ${oldHtml ? `CURRENT UI (Reference this for edits): [HTML provided below]` : ''}
 ${feedbackHistory.length > 0 ? `CRITICAL USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
@@ -58,7 +94,7 @@ UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
 2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
 3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
-4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths. For example, if the data says \`"image": "/images/project1.png"\`, you must use exactly \`src="/images/project1.png"\`.
+4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
 6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.`
 					},
@@ -78,11 +114,18 @@ UI REQUIREMENTS:
 		const data = await res.json();
 		let generatedHtml = data.choices[0].message.content;
 
-		// Clean up markdown block if the model included it despite instructions
 		if (generatedHtml.startsWith('```html')) {
 			generatedHtml = generatedHtml.replace(/^```html\n?/, '').replace(/\n?```$/, '');
 		} else if (generatedHtml.startsWith('```')) {
 			generatedHtml = generatedHtml.replace(/^```\n?/, '').replace(/\n?```$/, '');
+		}
+
+		// MAIL MERGE: Replace placeholders with actual content
+		for (const [id, value] of Object.entries(mapping)) {
+			const placeholder = `[[${id}]]`;
+			const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const regex = new RegExp(escapedPlaceholder, 'g');
+			generatedHtml = generatedHtml.replace(regex, value);
 		}
 
 		if (slug) {

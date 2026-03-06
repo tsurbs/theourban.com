@@ -37,7 +37,9 @@
 	},
 	"dependencies": {
 		"@fontsource/young-serif": "^5.2.7",
+		"@types/pg": "^8.18.0",
 		"lucide-svelte": "^0.577.0",
+		"pg": "^8.20.0",
 		"postgres": "^3.4.5"
 	}
 }
