@@ -29,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			},
 			body: JSON.stringify({
 				// Using the requested Gemini Flash Lite preview model
-				model: 'google/gemini-3.1-flash-lite-preview',
+				model: 'openai/gpt-oss-safeguard-20b:nitro',
 				messages: [
 					{
 						role: 'system',
@@ -45,7 +45,7 @@ ${feedbackHistory.length > 0 ? `USER FEEDBACK HISTORY (Apply these changes/reque
 
 CRITICAL UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
-2. Use JavaScript to handle navigation (showing/hiding page sections or re-rendering) purely client-side.
+2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
 3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
 4. All images, fonts, and assets must be referenced using absolute paths provided in the content data (e.g., /pages/image.png). These are served from the static directory.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.

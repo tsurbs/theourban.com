@@ -18,7 +18,7 @@ export const POST: RequestHandler = async () => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'google/gemini-3.1-flash-lite-preview',
+                model: 'openai/gpt-oss-safeguard-20b:nitro',
                 messages: [
                     {
                         role: 'system',
