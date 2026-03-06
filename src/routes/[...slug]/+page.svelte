@@ -1,77 +1,80 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
+	import { page } from "$app/stores";
 	import { siteState } from "$lib/siteState.svelte";
 
 	let loading = $state(!siteState.hasGenerated);
 	let error = $state("");
+	let feedbackInput = $state("");
 
-	onMount(() => {
-		// Only run the generation flow if we haven't already generated the site in this session.
-		// Hard refreshes will reset siteState.hasGenerated to false, triggering a new build.
-		// Internal SvelteKit client-side navigation will keep siteState, so this won't run again.
-		if (siteState.hasGenerated) {
-			loading = false;
-			return;
-		}
-
+	async function runGeneration() {
 		const abortController = new AbortController();
+		try {
+			loading = true;
+			error = "";
 
-		async function init() {
-			try {
-				loading = true;
-				error = "";
-
-				// 1. Generate Style Guide if missing
-				if (!siteState.styleGuide) {
-					const styleRes = await fetch("/api/generate-style-guide", {
-						method: "POST",
-						signal: abortController.signal,
-					});
-					if (!styleRes.ok) {
-						const errData = await styleRes.json().catch(() => ({}));
-						throw new Error(
-							errData.error ||
-								`Style API returned ${styleRes.status}`,
-						);
-					}
-					const styleData = await styleRes.json();
-					siteState.styleGuide = styleData.styleGuide;
-				}
-
-				// 2. Generate the ENTIRE SPA
-				const uiRes = await fetch("/api/generate-ui", {
+			// 1. Generate Style Guide if missing
+			if (!siteState.styleGuide) {
+				const styleRes = await fetch("/api/generate-style-guide", {
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ styleGuide: siteState.styleGuide }),
 					signal: abortController.signal,
 				});
-
-				if (!uiRes.ok) {
-					const errData = await uiRes.json().catch(() => ({}));
+				if (!styleRes.ok) {
+					const errData = await styleRes.json().catch(() => ({}));
 					throw new Error(
-						errData.error || `UI API returned ${uiRes.status}`,
+						errData.error ||
+							`Style API returned ${styleRes.status}`,
 					);
 				}
-
-				const uiData = await uiRes.json();
-				if (uiData.error) throw new Error(uiData.error);
-
-				siteState.generatedHtml = uiData.html;
-				siteState.hasGenerated = true;
-				loading = false;
-			} catch (err) {
-				if ((err as Error).name === "AbortError") return;
-				console.error("Error in generation flow:", err);
-				error = (err as Error).message || "Failed to generate UI";
-				loading = false;
+				const styleData = await styleRes.json();
+				siteState.styleGuide = styleData.styleGuide;
 			}
+
+			// 2. Generate the ENTIRE SPA with feedback history
+			const uiRes = await fetch("/api/generate-ui", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					styleGuide: siteState.styleGuide,
+					feedbackHistory: siteState.feedbackHistory,
+				}),
+				signal: abortController.signal,
+			});
+
+			if (!uiRes.ok) {
+				const errData = await uiRes.json().catch(() => ({}));
+				throw new Error(
+					errData.error || `UI API returned ${uiRes.status}`,
+				);
+			}
+
+			const uiData = await uiRes.json();
+			if (uiData.error) throw new Error(uiData.error);
+
+			siteState.generatedHtml = uiData.html;
+			siteState.hasGenerated = true;
+			loading = false;
+		} catch (err) {
+			if ((err as Error).name === "AbortError") return;
+			console.error("Error in generation flow:", err);
+			error = (err as Error).message || "Failed to generate UI";
+			loading = false;
 		}
+	}
 
-		init();
+	function handleRegenerate() {
+		if (!feedbackInput.trim()) return;
+		siteState.feedbackHistory.push(feedbackInput.trim());
+		feedbackInput = "";
+		runGeneration();
+	}
 
-		return () => {
-			abortController.abort();
-		};
+	onMount(() => {
+		if (!siteState.hasGenerated) {
+			runGeneration();
+		} else {
+			loading = false;
+		}
 	});
 </script>
 
@@ -95,9 +98,30 @@
 						Add this to your <code>.env</code> file.
 					</p>
 				{/if}
+				<button class="retry-btn" onclick={() => runGeneration()}
+					>Retry</button
+				>
 			</div>
 		</div>
 	{:else}
+		<!-- Input Overlay -->
+		<div class="feedback-overlay">
+			<div class="input-container">
+				<input
+					type="text"
+					bind:value={feedbackInput}
+					placeholder="Describe changes or feedback..."
+					onkeydown={(e) => e.key === "Enter" && handleRegenerate()}
+				/>
+				<button
+					onclick={handleRegenerate}
+					disabled={!feedbackInput.trim()}
+				>
+					Regenerate
+				</button>
+			</div>
+		</div>
+
 		<iframe srcdoc={siteState.generatedHtml} title="Portfolio Site"
 		></iframe>
 	{/if}
@@ -109,6 +133,8 @@
 		padding: 0;
 		overflow: hidden;
 		background: white;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+			Helvetica, Arial, sans-serif;
 	}
 
 	.fullscreen-container {
@@ -118,7 +144,7 @@
 		width: 100vw;
 		height: 100vh;
 		background: white;
-		z-index: 9999;
+		z-index: 1;
 	}
 
 	.loader-overlay {
@@ -128,6 +154,7 @@
 		align-items: center;
 		justify-content: center;
 		background: white;
+		z-index: 100;
 	}
 
 	.spinner {
@@ -139,6 +166,59 @@
 		animation: spin 0.8s linear infinite;
 	}
 
+	.feedback-overlay {
+		position: fixed;
+		top: 20px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 1000;
+		width: 90%;
+		max-width: 600px;
+	}
+
+	.input-container {
+		display: flex;
+		gap: 10px;
+		padding: 8px;
+		background: rgba(255, 255, 255, 0.8);
+		backdrop-filter: blur(12px);
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 999px;
+		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+	}
+
+	.input-container input {
+		flex: 1;
+		border: none;
+		background: transparent;
+		padding: 8px 16px;
+		outline: none;
+		font-size: 14px;
+		color: #1a1a1a;
+	}
+
+	.input-container button {
+		padding: 8px 20px;
+		background: #1a1a1a;
+		color: white;
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+		font-size: 14px;
+		font-weight: 500;
+		transition: all 0.2s;
+	}
+
+	.input-container button:hover:not(:disabled) {
+		background: #333;
+		transform: translateY(-1px);
+	}
+
+	.input-container button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
 	.error-overlay {
 		position: absolute;
 		inset: 0;
@@ -147,6 +227,7 @@
 		justify-content: center;
 		background: #f9f9f9;
 		padding: 20px;
+		z-index: 101;
 	}
 
 	.error-card {
@@ -162,6 +243,16 @@
 	.error-card h2 {
 		color: #cc0000;
 		margin-top: 0;
+	}
+
+	.retry-btn {
+		margin-top: 20px;
+		padding: 8px 24px;
+		background: #cc0000;
+		color: white;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
 	}
 
 	.env-hint {

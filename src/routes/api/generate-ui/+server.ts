@@ -11,9 +11,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	let styleGuide = null;
+	let feedbackHistory: string[] = [];
 	try {
 		const body = await request.json();
 		styleGuide = body.styleGuide || null;
+		feedbackHistory = body.feedbackHistory || [];
 	} catch {
 		// Ignore bad JSON
 	}
@@ -39,6 +41,7 @@ The user should be able to navigate between all pages (About, Projects, etc.) wi
 
 Here is the FULL site data: ${JSON.stringify(content, null, 2)}
 ${styleGuide ? `CRITICAL STYLE GUIDE: Follow these branding rules strictly: ${JSON.stringify(styleGuide, null, 2)}` : ''}
+${feedbackHistory.length > 0 ? `USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
 
 CRITICAL UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
