@@ -90,7 +90,7 @@
         // If there is HTML from DB, render it.
         else if (data.site.generatedHtml) {
             siteState.generatedHtml = data.site.generatedHtml;
-            siteState.styleGuide = data.site.styleGuide as Record<string, any>;
+            siteState.styleGuide = data.site.styleGuide as Record<string, unknown>;
             siteState.hasGenerated = true;
             siteState.feedbackHistory = data.site.feedbackHistory || [];
             loading = false;
@@ -99,6 +99,31 @@
         else {
             runGeneration();
         }
+    });
+
+    let processedHtml = $derived.by(() => {
+        if (!siteState.generatedHtml) return "";
+
+        const injection = `
+<script>
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (link && link.href && !link.href.startsWith('#') && !link.href.startsWith(window.location.origin)) {
+      e.preventDefault();
+      window.top.location.href = link.href;
+    }
+  });
+</script>
+        `;
+
+        // Inject before </body> if present, otherwise at the end
+        if (siteState.generatedHtml.includes("</body>")) {
+            return siteState.generatedHtml.replace(
+                "</body>",
+                `${injection}</body>`,
+            );
+        }
+        return siteState.generatedHtml + injection;
     });
 </script>
 
@@ -173,8 +198,7 @@
             </a>
         </div>
 
-        <iframe srcdoc={siteState.generatedHtml} title="Portfolio Site"
-        ></iframe>
+        <iframe srcdoc={processedHtml} title="Portfolio Site"></iframe>
     {/if}
 </div>
 

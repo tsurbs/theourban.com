@@ -6,11 +6,11 @@ import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
-function createMailMerge(obj: any, prefix: string = 'CONTENT_VAR_'): { template: any, mapping: Record<string, string> } {
+function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, string> } {
 	const mapping: Record<string, string> = {};
 	let counter = 0;
 
-	function walk(val: any): any {
+	function walk(val: unknown): unknown {
 		if (typeof val === 'string') {
 			const isLikelyPath = val.startsWith('/') || val.startsWith('http');
 			if (!isLikelyPath && val.length > 0) {
@@ -24,16 +24,17 @@ function createMailMerge(obj: any, prefix: string = 'CONTENT_VAR_'): { template:
 			return val.map(walk);
 		}
 		if (val !== null && typeof val === 'object') {
-			const newObj: any = {};
-			for (const key in val) {
-				newObj[key] = walk(val[key]);
+			const newObj: Record<string, unknown> = {};
+			const typedVal = val as Record<string, unknown>;
+			for (const key in typedVal) {
+				newObj[key] = walk(typedVal[key]);
 			}
 			return newObj;
 		}
 		return val;
 	}
 
-	return { template: walk(obj), mapping };
+	return { template: walk(obj) as Record<string, unknown>, mapping };
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -96,7 +97,8 @@ UI REQUIREMENTS:
 3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
 4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
-6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.`
+6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.
+7. CRITICAL: For all external links (starting with http), you MUST add the attribute target="_top" to ensure the link navigates out of the preview iframe.`
 					},
 					...(oldHtml ? [{
 						role: 'user',
