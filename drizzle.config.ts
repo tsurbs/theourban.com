@@ -1,11 +1,15 @@
 import { defineConfig } from 'drizzle-kit';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.theourban_com_DATABASE_URL;
+
+if (!connectionString) throw new Error('A database connection string is not set');
 
 export default defineConfig({
 	schema: './src/lib/server/db/schema.ts',
 	dialect: 'postgresql',
-	dbCredentials: { url: process.env.DATABASE_URL },
+	dbCredentials: { url: connectionString },
 	verbose: true,
-	strict: true
+	strict: false
 });

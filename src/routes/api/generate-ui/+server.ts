@@ -2,6 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import content from '$lib/assets/content.json';
 import { env } from '$env/dynamic/private';
+import { db } from '$lib/server/db';
+import { site } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const API_KEY = env.OPENROUTER_API_KEY;
@@ -13,11 +16,13 @@ export const POST: RequestHandler = async ({ request }) => {
 	let styleGuide = null;
 	let feedbackHistory: string[] = [];
 	let oldHtml = '';
+	let slug = '';
 	try {
 		const body = await request.json();
 		styleGuide = body.styleGuide || null;
 		feedbackHistory = body.feedbackHistory || [];
 		oldHtml = body.oldHtml || '';
+		slug = body.slug || '';
 	} catch {
 		// Ignore bad JSON
 	}
@@ -53,7 +58,7 @@ UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
 2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
 3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
-4. All images, fonts, and assets must be referenced using absolute paths provided in the content data (e.g., /pages/image.png). These are served from the static directory.
+4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths. For example, if the data says \`"image": "/images/project1.png"\`, you must use exactly \`src="/images/project1.png"\`.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
 6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.`
 					},
@@ -78,6 +83,16 @@ UI REQUIREMENTS:
 			generatedHtml = generatedHtml.replace(/^```html\n?/, '').replace(/\n?```$/, '');
 		} else if (generatedHtml.startsWith('```')) {
 			generatedHtml = generatedHtml.replace(/^```\n?/, '').replace(/\n?```$/, '');
+		}
+
+		if (slug) {
+			await db.update(site)
+				.set({
+					generatedHtml,
+					feedbackHistory,
+					updatedAt: new Date()
+				})
+				.where(eq(site.slug, slug));
 		}
 
 		return json({ html: generatedHtml });
