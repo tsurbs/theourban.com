@@ -1,12 +1,23 @@
 <script lang="ts">
     import type { PageData } from "./$types";
-    import { ThumbsUp } from "lucide-svelte";
+    import { ThumbsUp, Search, X } from "lucide-svelte";
     import { enhance } from "$app/forms";
     import { onMount } from "svelte";
 
     let { data }: { data: PageData } = $props();
 
     let votedSlugs = $state<string[]>([]);
+    let searchQuery = $state("");
+
+    let filteredSites = $derived(
+        data.sites.filter(
+            (s) =>
+                s.themeWords
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase()) ||
+                s.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+        ),
+    );
 
     onMount(() => {
         const stored = localStorage.getItem("voted_sites");
@@ -61,13 +72,46 @@
         <a href="/" class="new-site-btn">Generate New Site</a>
     </header>
 
+    <div class="search-section">
+        <div class="search-input-wrapper">
+            <div class="search-icon-wrapper">
+                <Search size={20} />
+            </div>
+            <input
+                type="text"
+                bind:value={searchQuery}
+                placeholder="Search by theme or slug..."
+                class="search-input"
+            />
+            {#if searchQuery}
+                <button
+                    class="clear-btn"
+                    onclick={() => (searchQuery = "")}
+                    aria-label="Clear search"
+                >
+                    <X size={18} />
+                </button>
+            {/if}
+        </div>
+        <div class="results-count">
+            Showing {filteredSites.length} of {data.sites.length} sites
+        </div>
+    </div>
+
     {#if data.sites.length === 0}
         <div class="empty-state">
             No sites generated yet. <a href="/">Be the first</a>.
         </div>
+    {:else if filteredSites.length === 0}
+        <div class="empty-state">
+            No sites match your search "{searchQuery}".
+            <button class="text-btn" onclick={() => (searchQuery = "")}
+                >Clear filters</button
+            >.
+        </div>
     {:else}
         <div class="site-grid">
-            {#each data.sites as site (site.slug)}
+            {#each filteredSites as site (site.slug)}
                 <div class="card-wrapper">
                     <a
                         href={`/${site.slug}`}
@@ -80,14 +124,14 @@
 
                             {#if site.styleGuide}
                                 <div class="colors">
-                                    {#each Object.entries(site.styleGuide as Record<string, any>).filter(([k, v]) => k
+                                    {#each Object.entries(site.styleGuide as Record<string, unknown>).filter(([k, v]) => k
                                                 .toLowerCase()
                                                 .includes("color") && typeof v === "string") as [key, color] (key)}
                                         <div class="color-swatch-container">
                                             <div
                                                 class="color-swatch"
-                                                style="background-color: {color};"
-                                                title="{key}: {color}"
+                                                style="background-color: {color as string};"
+                                                title="{key}: {color as string}"
                                             ></div>
                                         </div>
                                     {/each}
@@ -179,7 +223,7 @@
 
     .gallery-header {
         text-align: center;
-        margin-bottom: 50px;
+        margin-bottom: 30px;
     }
 
     .gallery-header h1 {
@@ -212,10 +256,86 @@
         transform: translateY(-2px);
     }
 
+    .search-section {
+        position: sticky;
+        top: 20px;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        padding: 15px 0;
+        margin-bottom: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 500px;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon-wrapper {
+        position: absolute;
+        left: 16px;
+        color: #999;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 14px 44px 14px 48px;
+        border-radius: 999px;
+        border: 1px solid #ddd;
+        background: #fff;
+        font-size: 1rem;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #111;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .clear-btn {
+        position: absolute;
+        right: 12px;
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background 0.2s;
+    }
+
+    .clear-btn:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
+
+    .results-count {
+        font-size: 0.85rem;
+        color: #777;
+        font-weight: 500;
+    }
+
     .site-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 30px;
+        padding-bottom: 40px;
     }
 
     .card-wrapper {
@@ -367,6 +487,16 @@
         background: #f9f9f9;
         border-radius: 12px;
         border: 1px dashed #ccc;
+    }
+
+    .text-btn {
+        background: none;
+        border: none;
+        color: #111;
+        font-weight: 600;
+        text-decoration: underline;
+        cursor: pointer;
+        padding: 0;
     }
 
     .empty-state a {
