@@ -8,15 +8,27 @@
 
     let votedSlugs = $state<string[]>([]);
     let searchQuery = $state("");
+    let sortBy = $state<"new" | "liked">("liked");
 
     let filteredSites = $derived(
-        data.sites.filter(
-            (s) =>
-                s.themeWords
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()) ||
-                s.slug.toLowerCase().includes(searchQuery.toLowerCase()),
-        ),
+        data.sites
+            .filter(
+                (s) =>
+                    s.themeWords
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                    s.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+            )
+            .sort((a, b) => {
+                if (sortBy === "liked") {
+                    return (b.thumbsUps || 0) - (a.thumbsUps || 0);
+                } else {
+                    return (
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    );
+                }
+            }),
     );
 
     onMount(() => {
@@ -72,7 +84,7 @@
         <a href="/" class="new-site-btn">Generate New Site</a>
     </header>
 
-    <div class="search-section">
+    <div class="filter-controls">
         <div class="search-input-wrapper">
             <div class="search-icon-wrapper">
                 <Search size={20} />
@@ -92,6 +104,14 @@
                     <X size={18} />
                 </button>
             {/if}
+        </div>
+
+        <div class="sort-wrapper">
+            <label for="sort-by">Sort by:</label>
+            <select id="sort-by" bind:value={sortBy} class="sort-select">
+                <option value="liked">Most Liked</option>
+                <option value="new">Newest First</option>
+            </select>
         </div>
         <div class="results-count">
             Showing {filteredSites.length} of {data.sites.length} sites
@@ -256,19 +276,48 @@
         transform: translateY(-2px);
     }
 
-    .search-section {
+    .filter-controls {
         position: sticky;
         top: 20px;
         z-index: 100;
-        background: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.9);
         backdrop-filter: blur(12px);
-        padding: 15px 0;
+        padding: 20px;
         margin-bottom: 40px;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        gap: 12px;
+        justify-content: center;
+        gap: 24px;
         border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto;
+        border-radius: 20px;
+        flex-wrap: wrap;
+    }
+
+    .sort-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    .sort-select {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        background: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .sort-select:focus {
+        outline: none;
+        border-color: #111;
     }
 
     .search-input-wrapper {
@@ -329,6 +378,9 @@
         font-size: 0.85rem;
         color: #777;
         font-weight: 500;
+        width: 100%;
+        text-align: center;
+        margin-top: 8px;
     }
 
     .site-grid {

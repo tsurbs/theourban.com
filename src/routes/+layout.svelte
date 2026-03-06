@@ -14,7 +14,6 @@
 	:global(body) {
 		margin: 0;
 		padding: 0;
-		overflow: hidden;
 		background: #fcfcfc;
 		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
 			Helvetica, Arial, sans-serif;

@@ -5,6 +5,8 @@
     import Wand2 from "lucide-svelte/icons/wand-2";
     import X from "lucide-svelte/icons/x";
     import LayoutGrid from "lucide-svelte/icons/layout-grid";
+    import ThumbsUp from "lucide-svelte/icons/thumbs-up";
+    import { enhance } from "$app/forms";
 
     let { data }: { data: PageData } = $props();
 
@@ -12,6 +14,7 @@
     let error = $state("");
     let feedbackInput = $state("");
     let barCollapsed = $state(false);
+    let votedSlugs = $state<string[]>([]);
 
     async function runGeneration() {
         const abortController = new AbortController();
@@ -60,7 +63,28 @@
         runGeneration();
     }
 
+    function handleVote(slug: string) {
+        if (!votedSlugs.includes(slug)) {
+            votedSlugs = [...votedSlugs, slug];
+            localStorage.setItem("voted_sites", JSON.stringify(votedSlugs));
+            data.site.thumbsUps = (data.site.thumbsUps || 0) + 1;
+        }
+    }
+
     onMount(async () => {
+        // Load voted sites from localStorage
+        const stored = localStorage.getItem("voted_sites");
+        if (stored) {
+            try {
+                votedSlugs = JSON.parse(stored);
+            } catch (e) {
+                console.error(
+                    "Failed to parse voted_sites from localStorage",
+                    e,
+                );
+            }
+        }
+
         // If it's a completely new custom slug via URL
         if (data.isNew) {
             try {
@@ -90,7 +114,10 @@
         // If there is HTML from DB, render it.
         else if (data.site.generatedHtml) {
             siteState.generatedHtml = data.site.generatedHtml;
-            siteState.styleGuide = data.site.styleGuide as Record<string, unknown>;
+            siteState.styleGuide = data.site.styleGuide as Record<
+                string,
+                unknown
+            >;
             siteState.hasGenerated = true;
             siteState.feedbackHistory = data.site.feedbackHistory || [];
             loading = false;
@@ -104,23 +131,23 @@
     let processedHtml = $derived.by(() => {
         if (!siteState.generatedHtml) return "";
 
-        const injection = `
-<script>
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('a');
-    if (link && link.href && !link.href.startsWith('#') && !link.href.startsWith(window.location.origin)) {
-      e.preventDefault();
-      window.top.location.href = link.href;
-    }
-  });
-</script>
-        `;
+        const injection =
+            "<script>\n" +
+            "  document.addEventListener('click', (e) => {\n" +
+            "    const link = e.target.closest('a');\n" +
+            "    if (link && link.href && !link.href.startsWith('#') && !link.href.startsWith(window.location.origin)) {\n" +
+            "      e.preventDefault();\n" +
+            "      window.top.location.href = link.href;\n" +
+            "    }\n" +
+            "  });\n" +
+            "<" +
+            "/script>\n";
 
         // Inject before </body> if present, otherwise at the end
         if (siteState.generatedHtml.includes("</body>")) {
             return siteState.generatedHtml.replace(
                 "</body>",
-                `${injection}</body>`,
+                injection + "</body>",
             );
         }
         return siteState.generatedHtml + injection;
@@ -196,6 +223,39 @@
             >
                 <LayoutGrid size={24} />
             </a>
+
+            {#if !data.isNew}
+                <form
+                    method="POST"
+                    action="/gallery?/thumbsUp"
+                    use:enhance={() => {
+                        handleVote(data.site.slug);
+                        return async ({ update }) => {
+                            await update();
+                        };
+                    }}
+                >
+                    <input type="hidden" name="slug" value={data.site.slug} />
+                    <button
+                        type="submit"
+                        class="magic-fab vote-fab"
+                        disabled={votedSlugs.includes(data.site.slug)}
+                        title={votedSlugs.includes(data.site.slug)
+                            ? "You already upvoted this site"
+                            : "Thumbs up this site"}
+                    >
+                        <ThumbsUp
+                            size={24}
+                            fill={votedSlugs.includes(data.site.slug)
+                                ? "currentColor"
+                                : "none"}
+                        />
+                        <span class="vote-count"
+                            >{data.site.thumbsUps || 0}</span
+                        >
+                    </button>
+                </form>
+            {/if}
         </div>
 
         <iframe srcdoc={processedHtml} title="Portfolio Site"></iframe>
@@ -354,6 +414,29 @@
         height: 48px;
         margin-left: auto;
         margin-right: 4px; /* Center align with the 56px button */
+    }
+
+    .magic-fab.vote-fab {
+        background: #fff;
+        color: #111;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        width: 56px;
+        height: 56px;
+        position: relative;
+    }
+
+    .vote-count {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #111;
+        color: #fff;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 999px;
+        min-width: 18px;
+        text-align: center;
     }
 
     .magic-fab:hover {

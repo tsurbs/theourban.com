@@ -20,6 +20,7 @@ export const load: PageServerLoad = async ({ params }) => {
                 styleGuide: null,
                 generatedHtml: null,
                 feedbackHistory: [],
+                thumbsUps: 0,
                 createdAt: new Date(),
                 updatedAt: new Date()
             }
