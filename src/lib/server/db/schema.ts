@@ -11,6 +11,7 @@ export const site = pgTable('site', {
 	styleGuide: jsonb('style_guide'),
 	generatedHtml: text('generated_html'),
 	feedbackHistory: jsonb('feedback_history').$type<string[]>(),
+	thumbsUps: integer('thumbs_ups').default(0).notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
