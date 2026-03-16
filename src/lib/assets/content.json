@@ -1,41 +1,35 @@
 {
     "name": "Theo Urban",
     "headline": "I’m an AI Major (with Math & LTI minors) @ Carnegie Mellon.  I run ScottyLabs, the premier Software Engineering Club at CMU, and am a Former 15-281 Head TA.  I'm passionate about the power of the internet to solve problems, and endlessly intrigued by AI, CS theory, math, and society.",
+    "profile_pic": "/pages/about-me.png",
     "links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/tsurbs"
+            "url": "https://github.com/tsurbs",
+            "icon": "/icons/github.png"
         },
         {
             "name": "LinkedIn",
-            "url": "https://www.linkedin.com/in/theo-urban-659a4b247/"
+            "url": "https://www.linkedin.com/in/theo-urban-659a4b247/",
+            "icon": "/icons/linkedin.png"
         },
         {
             "name": "Resume",
-            "url": "https://resume.theourban.com"
+            "url": "https://resume.theourban.com",
+            "icon": "/icons/resume.svg"
         },
         {
             "name": "Email",
-            "url": "mailto:theo.s.urban@gmail.com"
+            "url": "mailto:theo.s.urban@gmail.com",
+            "icon": "/icons/mail.svg"
         },
         {
             "name": "Strava",
-            "url": "https://www.strava.com/athletes/44903891"
+            "url": "https://www.strava.com/athletes/44903891",
+            "icon": "/icons/strava.svg"
         }
     ],
     "pages": [
-        {
-            "title": "About me",
-            "tags": [
-                "AI",
-                "CS",
-                "Misc."
-            ],
-            "priority": "0",
-            "cover_image": "/pages/about-me.png",
-            "slug": "about-me",
-            "content": "<p>This is the about me page content.</p>"
-        },
         {
             "title": "ScottyLabs",
             "tags": [

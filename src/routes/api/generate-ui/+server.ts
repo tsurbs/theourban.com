@@ -39,6 +39,7 @@ function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT
 
 export const POST: RequestHandler = async ({ request }) => {
 	const API_KEY = env.OPENROUTER_API_KEY;
+	const MODEL = env.OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite-preview';
 
 	if (!API_KEY) {
 		return json({ error: 'Missing OPENROUTER_API_KEY in .env' }, { status: 500 });
@@ -68,7 +69,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				model: 'google/gemini-3.1-flash-lite-preview',
+				model: MODEL,
 				reasoning: {
 					"max_tokens": 0,
 				},
