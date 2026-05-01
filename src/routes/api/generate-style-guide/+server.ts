@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import content from '$lib/assets/content.json';
 import { env } from '$env/dynamic/private';
 import { geminiGenerateContent } from '$lib/server/gemini';
+import { buildGenerationCallStats } from '$lib/server/geminiPricing';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 
@@ -60,7 +61,8 @@ CRITICAL INSTRUCTION: Base the entire style guide identity and colors around thi
 Reply ONLY with the raw JSON object. Do not include markdown formatting or explanations.`;
 
     try {
-        let styleContent = await geminiGenerateContent({
+        const t0 = Date.now();
+        const { text: styleContentRaw, usage } = await geminiGenerateContent({
             apiKey: API_KEY,
             model: MODEL,
             systemInstruction,
@@ -71,6 +73,8 @@ Reply ONLY with the raw JSON object. Do not include markdown formatting or expla
                 }
             ]
         });
+        let styleContent = styleContentRaw;
+        const stats = buildGenerationCallStats(usage, Date.now() - t0);
 
         // Clean up markdown block if the model included it
         if (styleContent.startsWith('```json')) {
@@ -98,7 +102,7 @@ Reply ONLY with the raw JSON object. Do not include markdown formatting or expla
             }
         });
 
-        return json({ slug, themeWords, styleGuide });
+        return json({ slug, themeWords, styleGuide, stats });
 
     } catch (err) {
         console.error("Error generating style guide:", err);

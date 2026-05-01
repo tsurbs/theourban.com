@@ -1,12 +1,16 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { siteState } from "$lib/siteState.svelte";
+    import type { GenerationCallStats } from "$lib/generationStats";
     import type { PageData } from "./$types";
     import Wand2 from "lucide-svelte/icons/wand-2";
     import X from "lucide-svelte/icons/x";
     import LayoutGrid from "lucide-svelte/icons/layout-grid";
     import ThumbsUp from "lucide-svelte/icons/thumbs-up";
     import { enhance } from "$app/forms";
+    import { ensurePreviewContentSecurityPolicy } from "$lib/previewSecurity";
+
+    const CONTEXT_MSG = "theourban-contextmenu";
 
     let { data }: { data: PageData } = $props();
 
@@ -15,6 +19,55 @@
     let feedbackInput = $state("");
     let barCollapsed = $state(false);
     let votedSlugs = $state<string[]>([]);
+    let contextMenuOpen = $state(false);
+    let contextMenuX = $state(0);
+    let contextMenuY = $state(0);
+    let nerdsModalOpen = $state(false);
+
+    function fmtUsd(n: number) {
+        return n.toLocaleString(undefined, {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: n < 0.01 ? 6 : 4,
+        });
+    }
+
+    function tokensPerSecond(stats: GenerationCallStats) {
+        const sec = stats.durationMs / 1000;
+        return sec > 0 ? stats.totalTokenCount / sec : 0;
+    }
+
+    const nerdsAggregate = $derived.by(() => {
+        const sg = siteState.generationStats.styleGuide;
+        const ui = siteState.generationStats.ui;
+        const parts: GenerationCallStats[] = [];
+        if (sg) parts.push(sg);
+        if (ui) parts.push(ui);
+        const totalTokens = parts.reduce((a, s) => a + s.totalTokenCount, 0);
+        const totalCost = parts.reduce((a, s) => a + s.estimatedCostUsd, 0);
+        const totalMs = parts.reduce((a, s) => a + s.durationMs, 0);
+        const sec = totalMs / 1000;
+        const tpsCombined = sec > 0 ? totalTokens / sec : 0;
+        return { parts, totalTokens, totalCost, totalMs, sec, tpsCombined };
+    });
+
+    function openContextMenuAt(clientX: number, clientY: number) {
+        contextMenuX = clientX;
+        contextMenuY = clientY;
+        contextMenuOpen = true;
+    }
+
+    function handleRootContextMenu(e: MouseEvent) {
+        const t = e.target as HTMLElement | null;
+        if (t?.closest("iframe")) return;
+        e.preventDefault();
+        openContextMenuAt(e.clientX, e.clientY);
+    }
+
+    function openNerdsModal() {
+        nerdsModalOpen = true;
+        contextMenuOpen = false;
+    }
 
     async function runGeneration() {
         const abortController = new AbortController();
@@ -44,6 +97,8 @@
             const uiData = await uiRes.json();
             if (uiData.error) throw new Error(uiData.error);
 
+            if (uiData.stats) siteState.generationStats.ui = uiData.stats;
+
             siteState.generatedHtml = uiData.html;
             siteState.hasGenerated = true;
             loading = false;
@@ -71,65 +126,100 @@
         }
     }
 
-    onMount(async () => {
-        // Load voted sites from localStorage
-        const stored = localStorage.getItem("voted_sites");
-        if (stored) {
-            try {
-                votedSlugs = JSON.parse(stored);
-            } catch (e) {
-                console.error(
-                    "Failed to parse voted_sites from localStorage",
-                    e,
-                );
+    onMount(() => {
+        function onIframeContextMenuMsg(ev: MessageEvent) {
+            if (ev.data?.type !== CONTEXT_MSG) return;
+            const iframe = document.querySelector(
+                ".site-takeover iframe",
+            ) as HTMLIFrameElement | null;
+            if (!iframe) return;
+            const rect = iframe.getBoundingClientRect();
+            openContextMenuAt(
+                rect.left + ev.data.clientX,
+                rect.top + ev.data.clientY,
+            );
+        }
+        window.addEventListener("message", onIframeContextMenuMsg);
+
+        function onKeydown(e: KeyboardEvent) {
+            if (e.key === "Escape") {
+                nerdsModalOpen = false;
+                contextMenuOpen = false;
             }
         }
+        window.addEventListener("keydown", onKeydown);
 
-        // If it's a completely new custom slug via URL
-        if (data.isNew) {
-            try {
-                loading = true;
-                const styleRes = await fetch("/api/generate-style-guide", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ themeWords: data.site.themeWords }),
-                });
+        void (async () => {
+            const stored = localStorage.getItem("voted_sites");
+            if (stored) {
+                try {
+                    votedSlugs = JSON.parse(stored);
+                } catch (e) {
+                    console.error(
+                        "Failed to parse voted_sites from localStorage",
+                        e,
+                    );
+                }
+            }
 
-                if (!styleRes.ok)
-                    throw new Error("Failed generating styles for custom slug");
-                const styleData = await styleRes.json();
+            if (data.isNew) {
+                siteState.generationStats = { ui: null, styleGuide: null };
+                try {
+                    loading = true;
+                    const styleRes = await fetch("/api/generate-style-guide", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            themeWords: data.site.themeWords,
+                        }),
+                    });
 
-                // Update our local site data with the returned generated style guide
-                data.site.styleGuide = styleData.styleGuide;
-                data.site.slug = styleData.slug; // Ensure slug matches what is saved
+                    if (!styleRes.ok)
+                        throw new Error(
+                            "Failed generating styles for custom slug",
+                        );
+                    const styleData = await styleRes.json();
 
-                // Then generate the full UI
-                runGeneration();
-            } catch (err) {
-                console.error(err);
-                error = "Failed to bootstrap custom site generation";
+                    if (styleData.stats)
+                        siteState.generationStats.styleGuide = styleData.stats;
+
+                    data.site.styleGuide = styleData.styleGuide;
+                    data.site.slug = styleData.slug;
+
+                    runGeneration();
+                } catch (err) {
+                    console.error(err);
+                    error = "Failed to bootstrap custom site generation";
+                    loading = false;
+                }
+            } else if (data.site.generatedHtml) {
+                siteState.generationStats = { ui: null, styleGuide: null };
+                siteState.generatedHtml = data.site.generatedHtml;
+                siteState.styleGuide = data.site.styleGuide as Record<
+                    string,
+                    unknown
+                >;
+                siteState.hasGenerated = true;
+                siteState.feedbackHistory = data.site.feedbackHistory || [];
                 loading = false;
+            } else {
+                siteState.generationStats = { ui: null, styleGuide: null };
+                runGeneration();
             }
-        }
-        // If there is HTML from DB, render it.
-        else if (data.site.generatedHtml) {
-            siteState.generatedHtml = data.site.generatedHtml;
-            siteState.styleGuide = data.site.styleGuide as Record<
-                string,
-                unknown
-            >;
-            siteState.hasGenerated = true;
-            siteState.feedbackHistory = data.site.feedbackHistory || [];
-            loading = false;
-        }
-        // We have a record but no HTML (e.g., interrupted generation)
-        else {
-            runGeneration();
-        }
+        })();
+
+        return () => {
+            window.removeEventListener("message", onIframeContextMenuMsg);
+            window.removeEventListener("keydown", onKeydown);
+        };
     });
 
     let processedHtml = $derived.by(() => {
         if (!siteState.generatedHtml) return "";
+
+        const htmlWithCsp = ensurePreviewContentSecurityPolicy(
+            siteState.generatedHtml,
+        );
 
         const injection =
             "<script>\n" +
@@ -140,21 +230,25 @@
             "      window.top.location.href = link.href;\n" +
             "    }\n" +
             "  });\n" +
+            "  document.addEventListener('contextmenu', (e) => {\n" +
+            "    e.preventDefault();\n" +
+            "    window.parent.postMessage({ type: '" +
+            CONTEXT_MSG +
+            "', clientX: e.clientX, clientY: e.clientY }, '*');\n" +
+            "  });\n" +
             "<" +
             "/script>\n";
 
         // Inject before </body> if present, otherwise at the end
-        if (siteState.generatedHtml.includes("</body>")) {
-            return siteState.generatedHtml.replace(
-                "</body>",
-                injection + "</body>",
-            );
+        if (htmlWithCsp.includes("</body>")) {
+            return htmlWithCsp.replace("</body>", injection + "</body>");
         }
-        return siteState.generatedHtml + injection;
+        return htmlWithCsp + injection;
     });
 </script>
 
-<div class="site-takeover">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="site-takeover" oncontextmenu={handleRootContextMenu}>
     {#if loading}
         <div class="loader-overlay">
             <h2>Designing site structure...</h2>
@@ -258,7 +352,144 @@
             {/if}
         </div>
 
-        <iframe srcdoc={processedHtml} title="Portfolio Site"></iframe>
+        <iframe
+            srcdoc={processedHtml}
+            title="Portfolio Site"
+            sandbox="allow-scripts allow-forms allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            referrerpolicy="no-referrer"
+        ></iframe>
+    {/if}
+
+    {#if contextMenuOpen}
+        <div
+            class="context-backdrop"
+            role="presentation"
+            onclick={() => (contextMenuOpen = false)}
+        ></div>
+        <div
+            class="context-menu"
+            style="left: {contextMenuX}px; top: {contextMenuY}px;"
+            role="menu"
+        >
+            <button type="button" role="menuitem" onclick={openNerdsModal}>
+                Stats for nerds
+            </button>
+        </div>
+    {/if}
+
+    {#if nerdsModalOpen}
+        <div
+            class="nerds-modal-backdrop"
+            role="presentation"
+            onclick={() => (nerdsModalOpen = false)}
+        ></div>
+        <div
+            class="nerds-modal"
+            role="dialog"
+            aria-labelledby="nerds-title"
+            tabindex="-1"
+        >
+            <div class="nerds-modal-header">
+                <h2 id="nerds-title">Stats for nerds</h2>
+                <button
+                    type="button"
+                    class="nerds-close"
+                    onclick={() => (nerdsModalOpen = false)}
+                    aria-label="Close"
+                >
+                    <X size={18} />
+                </button>
+            </div>
+            {#if nerdsAggregate.parts.length === 0}
+                <p class="nerds-empty">
+                    No Gemini stats yet. Generate or regenerate the site to record
+                    token usage.
+                </p>
+            {:else}
+                <div class="nerds-sections">
+                    {#if siteState.generationStats.styleGuide}
+                        {@const s = siteState.generationStats.styleGuide}
+                        <section>
+                            <h3>Style guide call</h3>
+                            <dl class="nerds-dl">
+                                <dt>Prompt tokens</dt>
+                                <dd>{s.promptTokenCount.toLocaleString()}</dd>
+                                <dt>Output tokens</dt>
+                                <dd>{s.candidatesTokenCount.toLocaleString()}</dd>
+                                <dt>Total tokens</dt>
+                                <dd>{s.totalTokenCount.toLocaleString()}</dd>
+                                <dt>Wall time</dt>
+                                <dd>{(s.durationMs / 1000).toFixed(2)} s</dd>
+                                <dt>Tokens / second</dt>
+                                <dd>
+                                    {tokensPerSecond(s).toLocaleString(undefined, {
+                                        maximumFractionDigits: 1,
+                                    })}
+                                </dd>
+                                <dt>Est. cost (3.1 Flash-Lite)</dt>
+                                <dd>{fmtUsd(s.estimatedCostUsd)}</dd>
+                            </dl>
+                        </section>
+                    {/if}
+                    {#if siteState.generationStats.ui}
+                        {@const s = siteState.generationStats.ui}
+                        <section>
+                            <h3>UI generation (latest)</h3>
+                            <dl class="nerds-dl">
+                                <dt>Prompt tokens</dt>
+                                <dd>{s.promptTokenCount.toLocaleString()}</dd>
+                                <dt>Output tokens</dt>
+                                <dd>{s.candidatesTokenCount.toLocaleString()}</dd>
+                                <dt>Total tokens</dt>
+                                <dd>{s.totalTokenCount.toLocaleString()}</dd>
+                                <dt>Wall time</dt>
+                                <dd>{(s.durationMs / 1000).toFixed(2)} s</dd>
+                                <dt>Tokens / second</dt>
+                                <dd>
+                                    {tokensPerSecond(s).toLocaleString(undefined, {
+                                        maximumFractionDigits: 1,
+                                    })}
+                                </dd>
+                                <dt>Est. cost (3.1 Flash-Lite)</dt>
+                                <dd>{fmtUsd(s.estimatedCostUsd)}</dd>
+                            </dl>
+                        </section>
+                    {/if}
+                </div>
+                {#if nerdsAggregate.parts.length > 1}
+                    <section class="nerds-combined">
+                        <h3>Combined (this session)</h3>
+                        <dl class="nerds-dl">
+                            <dt>Total tokens</dt>
+                            <dd>
+                                {nerdsAggregate.totalTokens.toLocaleString()}
+                            </dd>
+                            <dt>Total wall time</dt>
+                            <dd>{nerdsAggregate.sec.toFixed(2)} s</dd>
+                            <dt>Tokens / second</dt>
+                            <dd>
+                                {nerdsAggregate.tpsCombined.toLocaleString(
+                                    undefined,
+                                    { maximumFractionDigits: 1 },
+                                )}
+                            </dd>
+                            <dt>Est. total cost</dt>
+                            <dd>{fmtUsd(nerdsAggregate.totalCost)}</dd>
+                        </dl>
+                    </section>
+                {/if}
+                <p class="nerds-footnote">
+                    {siteState.generationStats.ui?.pricingNote ??
+                        siteState.generationStats.styleGuide?.pricingNote ??
+                        ""}
+                    <a
+                        href="https://ai.google.dev/pricing"
+                        target="_blank"
+                        rel="noreferrer">ai.google.dev/pricing</a
+                    >
+                </p>
+            {/if}
+        </div>
     {/if}
 </div>
 
@@ -523,6 +754,162 @@
         height: 100%;
         border: none;
         display: block;
+    }
+
+    .context-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        background: transparent;
+    }
+
+    .context-menu {
+        position: fixed;
+        z-index: 10051;
+        min-width: 180px;
+        padding: 4px 0;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+    }
+
+    .context-menu button {
+        display: block;
+        width: 100%;
+        padding: 10px 14px;
+        border: none;
+        background: none;
+        text-align: left;
+        font-size: 14px;
+        color: #1a1a1a;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .context-menu button:hover {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .nerds-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10055;
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(2px);
+    }
+
+    .nerds-modal {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10056;
+        width: min(420px, calc(100vw - 32px));
+        max-height: min(80vh, 560px);
+        overflow: auto;
+        padding: 20px 22px 18px;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            sans-serif;
+    }
+
+    .nerds-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .nerds-modal-header h2 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111;
+    }
+
+    .nerds-close {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.06);
+        color: #333;
+        cursor: pointer;
+    }
+
+    .nerds-close:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    .nerds-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .nerds-sections section h3,
+    .nerds-combined h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #666;
+    }
+
+    .nerds-dl {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px 16px;
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .nerds-dl dt {
+        margin: 0;
+        color: #555;
+    }
+
+    .nerds-dl dd {
+        margin: 0;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #111;
+        font-weight: 500;
+    }
+
+    .nerds-combined {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .nerds-footnote {
+        margin: 16px 0 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #777;
+    }
+
+    .nerds-footnote a {
+        color: #333;
+        margin-left: 4px;
+    }
+
+    .nerds-empty {
+        margin: 0;
+        font-size: 14px;
+        color: #555;
+        line-height: 1.5;
     }
 
     @keyframes spin {

@@ -13,6 +13,7 @@
       siteState.styleGuide = null;
       siteState.hasGenerated = false;
       siteState.feedbackHistory = [];
+      siteState.generationStats = { ui: null, styleGuide: null };
 
       const styleRes = await fetch("/api/generate-style-guide", {
         method: "POST",
@@ -27,6 +28,8 @@
 
       const styleData = await styleRes.json();
       siteState.styleGuide = styleData.styleGuide;
+      if (styleData.stats)
+        siteState.generationStats.styleGuide = styleData.stats;
 
       // Redirect to the new slug page
       // eslint-disable-next-line @sveltejs/valid-compile

@@ -2,12 +2,18 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 export type GeminiChatTurn = { role: 'user' | 'model'; content: string };
 
+export type GeminiUsage = {
+	promptTokenCount: number;
+	candidatesTokenCount: number;
+	totalTokenCount: number;
+};
+
 export async function geminiGenerateContent(options: {
 	apiKey: string;
 	model: string;
 	systemInstruction: string;
 	messages: GeminiChatTurn[];
-}): Promise<string> {
+}): Promise<{ text: string; usage: GeminiUsage | null }> {
 	const { apiKey, model, systemInstruction, messages } = options;
 
 	const contents = messages.map((m) => ({
@@ -34,6 +40,11 @@ export async function geminiGenerateContent(options: {
 	const data = (await res.json()) as {
 		candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 		promptFeedback?: { blockReason?: string };
+		usageMetadata?: {
+			promptTokenCount?: number;
+			candidatesTokenCount?: number;
+			totalTokenCount?: number;
+		};
 	};
 
 	const parts = data.candidates?.[0]?.content?.parts;
@@ -42,5 +53,15 @@ export async function geminiGenerateContent(options: {
 		throw new Error(blockReason ? `Gemini blocked: ${blockReason}` : 'Gemini returned no content');
 	}
 
-	return parts.map((p) => p.text ?? '').join('');
+	const u = data.usageMetadata;
+	const usage: GeminiUsage | null =
+		u && typeof u.totalTokenCount === 'number'
+			? {
+					promptTokenCount: u.promptTokenCount ?? 0,
+					candidatesTokenCount: u.candidatesTokenCount ?? 0,
+					totalTokenCount: u.totalTokenCount
+				}
+			: null;
+
+	return { text: parts.map((p) => p.text ?? '').join(''), usage };
 }

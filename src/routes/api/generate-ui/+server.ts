@@ -3,9 +3,11 @@ import type { RequestHandler } from './$types';
 import content from '$lib/assets/content.json';
 import { env } from '$env/dynamic/private';
 import { geminiGenerateContent } from '$lib/server/gemini';
+import { buildGenerationCallStats } from '$lib/server/geminiPricing';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { ensurePreviewContentSecurityPolicy, escapeHtmlForMailMerge } from '$lib/previewSecurity';
 
 function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, string> } {
 	const mapping: Record<string, string> = {};
@@ -88,7 +90,8 @@ UI REQUIREMENTS:
 7. CRITICAL: For all external links (starting with http), you MUST add the attribute target="_top" to ensure the link navigates out of the preview iframe.`;
 
 	try {
-		let generatedHtml = await geminiGenerateContent({
+		const t0 = Date.now();
+		const { text: generatedHtmlRaw, usage } = await geminiGenerateContent({
 			apiKey: API_KEY,
 			model: MODEL,
 			systemInstruction,
@@ -96,6 +99,8 @@ UI REQUIREMENTS:
 				? [{ role: 'user', content: `Here is the current HTML code of the site for your reference: \n\n${oldHtml}` }]
 				: [{ role: 'user', content: 'Generate the portfolio SPA HTML exactly as specified in the system instructions.' }]
 		});
+		let generatedHtml = generatedHtmlRaw;
+		const stats = buildGenerationCallStats(usage, Date.now() - t0);
 
 		if (generatedHtml.startsWith('```html')) {
 			generatedHtml = generatedHtml.replace(/^```html\n?/, '').replace(/\n?```$/, '');
@@ -108,8 +113,10 @@ UI REQUIREMENTS:
 			const placeholder = `[[${id}]]`;
 			const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			const regex = new RegExp(escapedPlaceholder, 'g');
-			generatedHtml = generatedHtml.replace(regex, value);
+			generatedHtml = generatedHtml.replace(regex, escapeHtmlForMailMerge(value));
 		}
+
+		generatedHtml = ensurePreviewContentSecurityPolicy(generatedHtml);
 
 		if (slug) {
 			await db.update(site)
@@ -121,7 +128,7 @@ UI REQUIREMENTS:
 				.where(eq(site.slug, slug));
 		}
 
-		return json({ html: generatedHtml });
+		return json({ html: generatedHtml, stats });
 
 	} catch (err) {
 		console.error("Error generating UI:", err);
