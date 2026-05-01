@@ -54,8 +54,8 @@
       <div class="error-card">
         <h2>Error Generating UI</h2>
         <p>{error}</p>
-        {#if error.includes("OPENROUTER_API_KEY")}
-          <div class="env-hint">OPENROUTER_API_KEY=your_key_here</div>
+        {#if error.includes("AISTUDIO_API_KEY")}
+          <div class="env-hint">AISTUDIO_API_KEY=your_key_here</div>
           <p class="small">Add this to your <code>.env</code> file.</p>
         {/if}
         <button class="retry-btn" onclick={() => startGeneration()}

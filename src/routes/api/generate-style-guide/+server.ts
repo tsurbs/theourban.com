@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import content from '$lib/assets/content.json';
 import { env } from '$env/dynamic/private';
+import { geminiGenerateContent } from '$lib/server/gemini';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 
@@ -25,11 +26,11 @@ function generateThemeWords() {
 
 
 export const POST: RequestHandler = async ({ request }) => {
-    const API_KEY = env.OPENROUTER_API_KEY;
-    const MODEL = env.OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite-preview';
+    const API_KEY = env.AISTUDIO_API_KEY;
+    const MODEL = env.AISTUDIO_MODEL || 'gemini-3.1-flash-lite-preview';
 
     if (!API_KEY) {
-        return json({ error: 'Missing OPENROUTER_API_KEY in .env' }, { status: 500 });
+        return json({ error: 'Missing AISTUDIO_API_KEY in .env' }, { status: 500 });
     }
 
     let customThemeWords = null;
@@ -43,20 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const themeWords = customThemeWords || generateThemeWords();
     const slug = themeWords.replace(/\s+/g, '-').toLowerCase();
 
-    try {
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                reasoning: { "max_tokens": 0 },
-                messages: [
-                    {
-                        role: 'system',
-                        content: `You are a world-class brand designer. Based on the provided portfolio data and a specific theme, create a cohesive and premium-feeling "Style Guide" in JSON format.
+    const systemInstruction = `You are a world-class brand designer. Based on the provided portfolio data and a specific theme, create a cohesive and premium-feeling "Style Guide" in JSON format.
 The style guide should include:
 - primaryColor (hex)
 - secondaryColor (hex)
@@ -69,23 +57,20 @@ The style guide should include:
 
 CRITICAL INSTRUCTION: Base the entire style guide identity and colors around this specific theme phrase: "${themeWords}"
 
-Reply ONLY with the raw JSON object. Do not include markdown formatting or explanations.`
-                    },
-                    {
-                        role: 'user',
-                        content: JSON.stringify({ name: content.name, headline: content.headline }, null, 2)
-                    }
-                ]
-            })
+Reply ONLY with the raw JSON object. Do not include markdown formatting or explanations.`;
+
+    try {
+        let styleContent = await geminiGenerateContent({
+            apiKey: API_KEY,
+            model: MODEL,
+            systemInstruction,
+            messages: [
+                {
+                    role: 'user',
+                    content: JSON.stringify({ name: content.name, headline: content.headline }, null, 2)
+                }
+            ]
         });
-
-        if (!res.ok) {
-            const errText = await res.text();
-            throw new Error(`API returned ${res.status}: ${errText}`);
-        }
-
-        const data = await res.json();
-        let styleContent = data.choices[0].message.content;
 
         // Clean up markdown block if the model included it
         if (styleContent.startsWith('```json')) {

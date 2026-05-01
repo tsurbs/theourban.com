@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import content from '$lib/assets/content.json';
 import { env } from '$env/dynamic/private';
+import { geminiGenerateContent } from '$lib/server/gemini';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
@@ -38,11 +39,11 @@ function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-	const API_KEY = env.OPENROUTER_API_KEY;
-	const MODEL = env.OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite-preview';
+	const API_KEY = env.AISTUDIO_API_KEY;
+	const MODEL = env.AISTUDIO_MODEL || 'gemini-3.1-flash-lite-preview';
 
 	if (!API_KEY) {
-		return json({ error: 'Missing OPENROUTER_API_KEY in .env' }, { status: 500 });
+		return json({ error: 'Missing AISTUDIO_API_KEY in .env' }, { status: 500 });
 	}
 
 	let styleGuide = null;
@@ -61,22 +62,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const { template, mapping } = createMailMerge(content);
 
-	try {
-		const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${API_KEY}`,
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				model: MODEL,
-				reasoning: {
-					"max_tokens": 0,
-				},
-				messages: [
-					{
-						role: 'system',
-						content: `You are an expert UI developer. Create a beautiful, modern, single HTML file (with embedded CSS and JS) representing a complete, multi-page personal portfolio website as a Single Page Application (SPA).
+	const systemInstruction = `You are an expert UI developer. Create a beautiful, modern, single HTML file (with embedded CSS and JS) representing a complete, multi-page personal portfolio website as a Single Page Application (SPA).
 						
 INSTRUCTION:
 Generate the layout using the provided JSON template. 
@@ -99,23 +85,17 @@ UI REQUIREMENTS:
 4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths.
 5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
 6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.
-7. CRITICAL: For all external links (starting with http), you MUST add the attribute target="_top" to ensure the link navigates out of the preview iframe.`
-					},
-					...(oldHtml ? [{
-						role: 'user',
-						content: `Here is the current HTML code of the site for your reference: \n\n${oldHtml}`
-					}] : [])
-				]
-			})
+7. CRITICAL: For all external links (starting with http), you MUST add the attribute target="_top" to ensure the link navigates out of the preview iframe.`;
+
+	try {
+		let generatedHtml = await geminiGenerateContent({
+			apiKey: API_KEY,
+			model: MODEL,
+			systemInstruction,
+			messages: oldHtml
+				? [{ role: 'user', content: `Here is the current HTML code of the site for your reference: \n\n${oldHtml}` }]
+				: [{ role: 'user', content: 'Generate the portfolio SPA HTML exactly as specified in the system instructions.' }]
 		});
-
-		if (!res.ok) {
-			const errText = await res.text();
-			throw new Error(`API returned ${res.status}: ${errText}`);
-		}
-
-		const data = await res.json();
-		let generatedHtml = data.choices[0].message.content;
 
 		if (generatedHtml.startsWith('```html')) {
 			generatedHtml = generatedHtml.replace(/^```html\n?/, '').replace(/\n?```$/, '');
