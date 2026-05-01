@@ -9,14 +9,16 @@ import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { ensurePreviewContentSecurityPolicy, escapeHtmlForMailMerge } from '$lib/previewSecurity';
 
-function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, string> } {
+function createMailMerge(obj: Record<string, unknown>, prefix: string = 'V'): { template: Record<string, unknown>, mapping: Record<string, string> } {
 	const mapping: Record<string, string> = {};
 	let counter = 0;
 
-	function walk(val: unknown): unknown {
+	function walk(val: unknown, fieldKey?: string): unknown {
 		if (typeof val === 'string') {
 			const isLikelyPath = val.startsWith('/') || val.startsWith('http');
-			if (!isLikelyPath && val.length > 0) {
+			const isTrivial = /^\d{1,3}$/.test(val);
+			const isNavSlug = fieldKey === 'slug' && /^[a-z0-9-]+$/i.test(val);
+			if (!isLikelyPath && !isTrivial && !isNavSlug && val.length > 0) {
 				const id = `${prefix}${counter++}`;
 				mapping[id] = val;
 				return `[[${id}]]`;
@@ -24,13 +26,13 @@ function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT
 			return val;
 		}
 		if (Array.isArray(val)) {
-			return val.map(walk);
+			return val.map((item) => walk(item));
 		}
 		if (val !== null && typeof val === 'object') {
 			const newObj: Record<string, unknown> = {};
 			const typedVal = val as Record<string, unknown>;
 			for (const key in typedVal) {
-				newObj[key] = walk(typedVal[key]);
+				newObj[key] = walk(typedVal[key], key);
 			}
 			return newObj;
 		}
@@ -63,31 +65,16 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const { template, mapping } = createMailMerge(content);
+	const tmpl = JSON.stringify(template);
+	const brand = styleGuide ? JSON.stringify(styleGuide) : '';
+	const fb =
+		feedbackHistory.length > 0 ? feedbackHistory.join(' | ') : '';
 
-	const systemInstruction = `You are an expert UI developer. Create a beautiful, modern, single HTML file (with embedded CSS and JS) representing a complete, multi-page personal portfolio website as a Single Page Application (SPA).
-						
-INSTRUCTION:
-Generate the layout using the provided JSON template. 
-CRITICAL: The text content in the JSON has been replaced with placeholders like [[CONTENT_VAR_0]]. 
-You MUST use these placeholders EXACTLY as they appear in the JSON template below whenever you need to render that specific piece of content. 
-DO NOT invent text, do not fix "typos" (you can't see the text anyway), and DO NOT omit placeholders. 
-
-Placeholders represent the actual user content that will be merged in after you generate the UI.
-
-Here is the SITE DATA TEMPLATE: ${JSON.stringify(template, null, 2)}
-
-${styleGuide ? `STYLE GUIDE: Follow these branding rules strictly: ${JSON.stringify(styleGuide, null, 2)}` : ''}
-${oldHtml ? `CURRENT UI (Reference this for edits): [HTML provided below]` : ''}
-${feedbackHistory.length > 0 ? `CRITICAL USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
-
-UI REQUIREMENTS:
-1. Include a navigation menu that links to all pages. 
-2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
-3. Use modern design aesthetics: glassmorphism, subtle animations, great typography, responsive design.
-4. CRITICAL IMAGE REQUIREMENT: You MUST use the exact absolute image URLs provided in the \`content\` JSON data. Do not make up image paths. Do not use relative paths.
-5. All page/project images must be displayed with uniform sizing and consistent aspect ratios (e.g., using object-fit: cover) to ensure a clean, grid-like or gallery aesthetic.
-6. Provide ONLY the raw HTML code starting with <!DOCTYPE html>. Do not output markdown blocks like \`\`\`html.
-7. CRITICAL: For all external links (starting with http), you MUST add the attribute target="_top" to ensure the link navigates out of the preview iframe.`;
+	const systemInstruction = `Single-file portfolio SPA HTML+CSS+JS. Start with <!DOCTYPE html>, no markdown fence.
+Emit every [[V0]],[[V1]],… placeholder from T verbatim (user text merges later); don't drop or substitute.
+T:${tmpl}${brand ? `\nBrand:${brand}` : ''}${fb ? `\nEdits:${fb}` : ''}
+Nav→all sections. Hash or toggle views only (no reload/URL takeover). Glassy/modern/responsive.
+Img src=take from T paths/URLs unchanged. Uniform thumbs (object-fit:cover). Links with http/mailto: target="_top".${oldHtml ? '\nRef prior HTML in next user msg.' : ''}`;
 
 	try {
 		const t0 = Date.now();
@@ -96,8 +83,8 @@ UI REQUIREMENTS:
 			model: MODEL,
 			systemInstruction,
 			messages: oldHtml
-				? [{ role: 'user', content: `Here is the current HTML code of the site for your reference: \n\n${oldHtml}` }]
-				: [{ role: 'user', content: 'Generate the portfolio SPA HTML exactly as specified in the system instructions.' }]
+				? [{ role: 'user', content: `Prior:\n${oldHtml}` }]
+				: [{ role: 'user', content: 'Build.' }]
 		});
 		let generatedHtml = generatedHtmlRaw;
 		const stats = buildGenerationCallStats(usage, Date.now() - t0);

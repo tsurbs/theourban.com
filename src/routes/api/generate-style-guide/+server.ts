@@ -45,20 +45,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const themeWords = customThemeWords || generateThemeWords();
     const slug = themeWords.replace(/\s+/g, '-').toLowerCase();
 
-    const systemInstruction = `You are a world-class brand designer. Based on the provided portfolio data and a specific theme, create a cohesive and premium-feeling "Style Guide" in JSON format.
-The style guide should include:
-- primaryColor (hex)
-- secondaryColor (hex)
-- backgroundColor (hex)
-- accentColor (hex)
-- headingFont (Google Font name)
-- bodyFont (Google Font name / Sans-serif fallback)
-- spacingScale (a short descriptive name for spacing tightness)
-- designSystemTheme (a string describing the vibe, e.g., "Minimalist High-Contrast", "Vibrant Brutalist", "Soft neumorphism")
-
-CRITICAL INSTRUCTION: Base the entire style guide identity and colors around this specific theme phrase: "${themeWords}"
-
-Reply ONLY with the raw JSON object. Do not include markdown formatting or explanations.`;
+    const systemInstruction = `JSON style guide only (no prose/fences). Keys: primaryColor,secondaryColor,backgroundColor,accentColor (hex), headingFont, bodyFont (Google names), spacingScale (short label), designSystemTheme (vibe phrase). Align palette+typography to theme: "${themeWords}"`;
 
     try {
         const t0 = Date.now();
@@ -69,7 +56,7 @@ Reply ONLY with the raw JSON object. Do not include markdown formatting or expla
             messages: [
                 {
                     role: 'user',
-                    content: JSON.stringify({ name: content.name, headline: content.headline }, null, 2)
+                    content: JSON.stringify({ n: content.name, h: content.headline })
                 }
             ]
         });
