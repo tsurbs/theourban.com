@@ -131,7 +131,7 @@
 		<h2 id="site-heading">Human-facing site entry points</h2>
 		<ul>
 			<li>
-				<a href={`${origin}/default-landing-page`}>Home portfolio preview</a> — fast path (bundled SPA from this content until a generated row exists in the database).
+				<a href={`${origin}/${data.defaultSiteSlug}`}>Home portfolio</a> — `/` redirects to this slug; content is served from the database like other pages.
 			</li>
 			<li>
 				<a href={`${origin}/new`}>Roll a new random theme</a> — invokes the Gemini style + UI pipeline (new slug).

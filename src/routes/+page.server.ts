@@ -1,8 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-
-const DEFAULT_SITE = '/default-landing-page';
+import { getDefaultSiteSlug } from '$lib/defaultSiteSlug';
 
 export const load: PageServerLoad = async () => {
-	throw redirect(303, DEFAULT_SITE);
+	throw redirect(303, `/${getDefaultSiteSlug()}`);
 };

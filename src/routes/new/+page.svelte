@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import { getDefaultSiteSlug } from "$lib/defaultSiteSlug";
 	import { siteState } from "$lib/siteState.svelte";
+
+	const defaultSlug = getDefaultSiteSlug();
 
 	let loading = $state(false);
 	let error = $state("");
@@ -43,8 +46,8 @@
 	<p class="kicker">Generative portfolio</p>
 	<h1>Roll a random theme</h1>
 	<p class="hint">
-		The home preview at <strong>/default-landing-page</strong> loads instantly. This page spins up a fresh style + layout
-		(new URL slug) via the APIs.
+		The site root <strong>/</strong> redirects to <strong>/{defaultSlug}</strong> (configurable). This page starts a
+		fresh style + layout at a new URL slug via the APIs.
 	</p>
 
 	<button type="button" class="btn" onclick={() => rollNewSite()} disabled={loading}>
@@ -60,7 +63,7 @@
 	{/if}
 
 	<p class="back">
-		<a href="/default-landing-page">Home preview</a>
+		<a href={`/${defaultSlug}`}>Home preview</a>
 		· <a href="/gallery">Gallery</a>
 	</p>
 </div>
