@@ -1,0 +1,14 @@
+{
+  "slug": "default-landing-page",
+  "themeWords": "default landing page",
+  "styleGuide": {
+    "primaryColor": "#e8eef6",
+    "secondaryColor": "#8b9eb5",
+    "backgroundColor": "#0d1117",
+    "accentColor": "#58a6ff",
+    "headingFont": "Fraunces",
+    "bodyFont": "Figtree",
+    "spacingScale": "relaxed",
+    "designSystemTheme": "Nocturnal editorial portfolio"
+  }
+}

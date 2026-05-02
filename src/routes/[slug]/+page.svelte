@@ -221,14 +221,35 @@
             siteState.generatedHtml,
         );
 
+        const po = JSON.stringify(data.previewOrigin ?? "");
+        const pv = JSON.stringify(data.previewPathname ?? "");
+
         const injection =
             "<script>\n" +
+            "  const PO=" +
+            po +
+            ";\n" +
+            "  const PV=" +
+            pv +
+            ";\n" +
+            "  function normPath(p){while(p.length>1&&p.endsWith('/'))p=p.slice(0,-1);return p||'/';}\n" +
             "  document.addEventListener('click', (e) => {\n" +
             "    const link = e.target.closest('a');\n" +
-            "    if (link && link.href && !link.href.startsWith('#') && !link.href.startsWith(window.location.origin)) {\n" +
+            "    if (!link || !link.href) return;\n" +
+            "    const raw = (link.getAttribute('href') || '').trim();\n" +
+            "    if (!raw || raw.startsWith('#')) return;\n" +
+            "    if (/^(javascript:|mailto:|tel:)/i.test(raw)) return;\n" +
+            "    const tgt = (link.getAttribute('target') || '').toLowerCase();\n" +
+            "    if (tgt === '_blank') return;\n" +
+            "    let u;\n" +
+            "    try { u = new URL(link.href); } catch (_) { return; }\n" +
+            "    if (PO && u.origin === PO && normPath(u.pathname) === normPath(PV)) {\n" +
             "      e.preventDefault();\n" +
-            "      window.top.location.href = link.href;\n" +
+            "      window.location.hash = u.hash || '#top';\n" +
+            "      return;\n" +
             "    }\n" +
+            "    e.preventDefault();\n" +
+            "    window.top.location.href = link.href;\n" +
             "  });\n" +
             "  document.addEventListener('contextmenu', (e) => {\n" +
             "    e.preventDefault();\n" +
@@ -355,7 +376,7 @@
         <iframe
             srcdoc={processedHtml}
             title="Portfolio Site"
-            sandbox="allow-scripts allow-forms allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            sandbox="allow-scripts allow-forms allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation allow-same-origin"
             referrerpolicy="no-referrer"
         ></iframe>
     {/if}

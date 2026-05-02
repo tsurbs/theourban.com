@@ -81,7 +81,7 @@
             A collection of generated brand identities and layouts ({data.sites
                 .length} total).
         </p>
-        <a href="/" class="new-site-btn">Generate New Site</a>
+        <a href="/new" class="new-site-btn">Generate New Site</a>
     </header>
 
     <div class="filter-controls">
@@ -120,7 +120,7 @@
 
     {#if data.sites.length === 0}
         <div class="empty-state">
-            No sites generated yet. <a href="/">Be the first</a>.
+            No sites generated yet. <a href="/new">Be the first</a>.
         </div>
     {:else if filteredSites.length === 0}
         <div class="empty-state">

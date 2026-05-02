@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Theo Urban</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&amp;family=Figtree:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0d1117;
+  --fg:#e8eef6;
+  --muted:#8b9eb5;
+  --accent:#58a6ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 800px at 10% -20%,rgba(88,166,255,0.12),transparent),var(--bg);color:var(--fg);font-family:'Figtree',system-ui,sans-serif;min-height:100vh;line-height:1.55;}
+nav{display:flex;flex-wrap:wrap;gap:.5rem .9rem;padding:1rem 1.25rem;position:sticky;top:0;z-index:10;background:rgba(13,17,23,0.72);backdrop-filter:blur(12px);border-bottom:1px solid rgba(232,238,246,0.08)}
+.navlink{font-size:.85rem;text-decoration:none;color:var(--muted);transition:color .2s;font-weight:500;padding:.25rem 0;border-bottom:2px solid transparent}
+.navlink:hover,.navlink.on{color:var(--accent);border-bottom-color:rgba(88,166,255,0.55)}
+.view{display:none;width:100%;max-width:52rem;margin:0 auto}
+.view.active{display:block}
+.hero{padding:2.75rem 1.25rem 3rem;max-width:48rem;margin:0 auto auto}
+.hero-inner{text-align:center}
+.profile{width:clamp(140px,32vw,200px);height:auto;border-radius:18px;border:1px solid rgba(232,238,246,0.12);box-shadow:0 20px 50px rgba(0,0,0,0.45)}
+.hero h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:clamp(1.8rem,4.5vw,2.65rem);letter-spacing:-.03em;margin:1.35rem 0 .75rem}
+.headline{font-size:1.05rem;color:var(--muted);max-width:36em;margin:0 auto;text-align:left}
+.social{margin-top:1.65rem;font-size:.93rem;line-height:1.7;color:var(--muted)}
+.social a{color:var(--accent);text-decoration:none;font-weight:600}
+.social a:hover{text-decoration:underline}
+.proj{padding:2rem 1.25rem 3rem;margin:0 auto}
+.card{border:1px solid rgba(232,238,246,0.1);border-radius:20px;overflow:hidden;background:rgba(232,238,246,0.03);backdrop-filter:blur(8px)}
+.card-media-wrap{width:100%;aspect-ratio:16/10;background:rgba(0,0,0,0.25)}
+.thumb{width:100%;height:100%;object-fit:cover;display:block}
+.card-body{padding:1.35rem 1.35rem 1.6rem}
+.card-body h2{font-family:'Fraunces',Georgia,serif;font-size:clamp(1.35rem,3vw,1.75rem);margin:0 0 .5rem;letter-spacing:-.02em}
+.tags{font-size:.85rem;color:var(--muted);margin:0 0 1rem}
+.body-html{font-size:.95rem;color:var(--fg)}
+.body-html :where(p:first-child){margin-top:0}
+.body-html :where(p:last-child){margin-bottom:0}
+</style>
+</head>
+<body>
+<nav id="nav" aria-label="Sections">
+  <a class="navlink on" href="#top">Home</a>
+  <a class="navlink" href="#scottylabs">ScottyLabs</a><a class="navlink" href="#cmumaps">CMUMaps</a><a class="navlink" href="#capital-one">Capital One</a><a class="navlink" href="#lazarus-ai">Lazarus AI</a><a class="navlink" href="#o-quest">O-Quest</a><a class="navlink" href="#15-281-ta">15-281 TA</a><a class="navlink" href="#running">Running</a><a class="navlink" href="#trellis-problem">Trellis Problem</a><a class="navlink" href="#style-transfer">Style Transfer</a><a class="navlink" href="#speculative-decoding">Speculative Decoding</a><a class="navlink" href="#variational-clip">Variational Clip</a>
+</nav>
+<section id="top" class="view active hero">
+	<div class="hero-inner">
+	  <img class="profile" src="/pages/about-me.png" alt="" width="220" height="220" decoding="async" />
+	  <h1>Theo Urban</h1>
+	  <p class="headline">I’m an AI Major (with Math &amp; LTI minors) @ Carnegie Mellon.  I run ScottyLabs, the premier Software Engineering Club at CMU, and am a Former 15-281 Head TA.  I'm passionate about the power of the internet to solve problems, and endlessly intrigued by AI, CS theory, math, and society.</p>
+	  <div class="social">
+	    <a href="https://github.com/tsurbs" target="_top" rel="noopener noreferrer">GitHub</a> · <a href="https://www.linkedin.com/in/theo-urban-659a4b247/" target="_top" rel="noopener noreferrer">LinkedIn</a> · <a href="https://resume.theourban.com" target="_top" rel="noopener noreferrer">Resume</a> · <a href="mailto:theo.s.urban@gmail.com" target="_top" rel="noopener noreferrer">Email</a> · <a href="https://www.strava.com/athletes/44903891" target="_top" rel="noopener noreferrer">Strava</a>
+	  </div>
+	</div>
+  </section>
+
+  <section id="scottylabs" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/scottylabs.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>ScottyLabs</h2>
+        <p class="tags">AI</p>
+        <div class="body-html"><p>This is the ScottyLabs page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cmumaps" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/cmumaps.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>CMUMaps</h2>
+        <p class="tags">AI · CS</p>
+        <div class="body-html"><p>This is the CMUMaps page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="capital-one" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/capital-one.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Capital One</h2>
+        <p class="tags">CS</p>
+        <div class="body-html"><p>This is the Capital One page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="lazarus-ai" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/lazarus-ai.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Lazarus AI</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the Lazarus AI page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="o-quest" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/o-quest.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>O-Quest</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the O-Quest page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="15-281-ta" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/15-281-ta.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>15-281 TA</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the 15-281 TA page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="running" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/running.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Running</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the Running page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trellis-problem" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/trellis-problem.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Trellis Problem</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the Trellis Problem page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="style-transfer" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/style-transfer.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Style Transfer</h2>
+        <p class="tags">Misc.</p>
+        <div class="body-html"><p>This is the Style Transfer page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="speculative-decoding" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/speculative-decoding.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Speculative Decoding</h2>
+        <p class="tags">AI</p>
+        <div class="body-html"><p>This is the Speculative Decoding page content.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="variational-clip" class="view proj">
+    <div class="card">
+      <div class="card-media-wrap"><img src="/pages/variational-clip.png" alt="" class="thumb" decoding="async" /></div>
+      <div class="card-body">
+        <h2>Variational Clip</h2>
+        <p class="tags">AI</p>
+        <div class="body-html"><p>This is the Variational Clip page content.</p></div>
+      </div>
+    </div>
+  </section>
+<script>
+(()=>{
+const views=[...document.querySelectorAll(".view")];
+const links=[...document.querySelectorAll(".navlink")];
+
+function ids(){return views.map((v)=>v.id)}
+
+function route(){
+  let key=(location.hash||"#top").slice(1)||"top";
+  if(!ids().includes(key))key="top";
+  views.forEach((v)=>v.classList.toggle("active",v.id===key));
+  links.forEach((a)=>{
+    const tgt=(a.getAttribute("href")||"").slice(1)||"top";
+    a.classList.toggle("on",tgt===key);
+  });
+}
+
+links.forEach((a)=>{
+  a.addEventListener("click",(e)=>{
+    e.preventDefault();
+    const h=a.getAttribute("href")||"#top";
+    if(location.hash===h)route();
+    else location.hash=h;
+  });
+});
+
+window.addEventListener("hashchange",route);
+route();
+})();
+</script>
+</body></html>
