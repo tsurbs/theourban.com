@@ -9,6 +9,15 @@
     import ThumbsUp from "lucide-svelte/icons/thumbs-up";
     import { enhance } from "$app/forms";
     import { ensurePreviewContentSecurityPolicy } from "$lib/previewSecurity";
+    import {
+        appendNerdPrompt,
+        clearNerdLedger,
+        emptyLifetimeTotals,
+        loadLifetimeTotals,
+        loadPromptLog,
+        type LifetimeNerdTotals,
+        type NerdPromptLogEntry,
+    } from "$lib/nerdLedger";
 
     const CONTEXT_MSG = "theourban-contextmenu";
 
@@ -23,6 +32,11 @@
     let contextMenuX = $state(0);
     let contextMenuY = $state(0);
     let nerdsModalOpen = $state(false);
+    let lifetimeTotals = $state<LifetimeNerdTotals>(emptyLifetimeTotals());
+    let promptLog = $state<NerdPromptLogEntry[]>([]);
+    let sessionStartedAt = $state(0);
+    let nerdsLogFilter = $state<"visit" | "all">("visit");
+    let nerdsExpandedId = $state<string | null>(null);
 
     function fmtUsd(n: number) {
         return n.toLocaleString(undefined, {
@@ -51,6 +65,80 @@
         return { parts, totalTokens, totalCost, totalMs, sec, tpsCombined };
     });
 
+    const displayedPromptLog = $derived(
+        nerdsLogFilter === "visit"
+            ? promptLog.filter(
+                  (e) => new Date(e.at).getTime() >= sessionStartedAt,
+              )
+            : promptLog,
+    );
+
+    const sessionVisitTokens = $derived(
+        promptLog
+            .filter((e) => new Date(e.at).getTime() >= sessionStartedAt)
+            .reduce((a, e) => a + e.stats.totalTokenCount, 0),
+    );
+
+    const sessionVisitCost = $derived(
+        promptLog
+            .filter((e) => new Date(e.at).getTime() >= sessionStartedAt)
+            .reduce((a, e) => a + e.stats.estimatedCostUsd, 0),
+    );
+
+    const sessionUiRegenerations = $derived(
+        promptLog.filter(
+            (e) =>
+                e.kind === "ui" &&
+                new Date(e.at).getTime() >= sessionStartedAt,
+        ).length,
+    );
+
+    const nerdsHasAnything = $derived(
+        nerdsAggregate.parts.length > 0 ||
+            lifetimeTotals.callCount > 0 ||
+            promptLog.length > 0,
+    );
+
+    function truncateSummary(s: string, max = 140) {
+        const t = s.trim();
+        if (t.length <= max) return t;
+        return t.slice(0, max - 1) + "…";
+    }
+
+    function fmtShortTime(iso: string) {
+        try {
+            return new Date(iso).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+        } catch {
+            return iso;
+        }
+    }
+
+    function copyNerdsExport() {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            slug: data.site.slug,
+            lifetimeBrowser: lifetimeTotals,
+            promptHistory: promptLog,
+            latestSnapshot: siteState.generationStats,
+        };
+        void navigator.clipboard?.writeText(
+            JSON.stringify(payload, null, 2),
+        );
+    }
+
+    function resetLocalNerdData() {
+        clearNerdLedger();
+        lifetimeTotals = emptyLifetimeTotals();
+        promptLog = [];
+        nerdsExpandedId = null;
+    }
+
     function openContextMenuAt(clientX: number, clientY: number) {
         contextMenuX = clientX;
         contextMenuY = clientY;
@@ -69,7 +157,7 @@
         contextMenuOpen = false;
     }
 
-    async function runGeneration() {
+    async function runGeneration(opts?: { uiSummary?: string }) {
         const abortController = new AbortController();
         try {
             loading = true;
@@ -97,7 +185,22 @@
             const uiData = await uiRes.json();
             if (uiData.error) throw new Error(uiData.error);
 
-            if (uiData.stats) siteState.generationStats.ui = uiData.stats;
+            if (uiData.stats) {
+                siteState.generationStats.ui = uiData.stats;
+                const summary =
+                    opts?.uiSummary ??
+                    (data.site.feedbackHistory?.length
+                        ? `Feedback: ${data.site.feedbackHistory[data.site.feedbackHistory.length - 1]}`
+                        : "Initial UI generation");
+                const r = appendNerdPrompt({
+                    kind: "ui",
+                    summary,
+                    stats: uiData.stats,
+                    slug: data.site.slug,
+                });
+                lifetimeTotals = r.lifetime;
+                promptLog = r.log;
+            }
 
             siteState.generatedHtml = uiData.html;
             siteState.hasGenerated = true;
@@ -111,11 +214,12 @@
     }
 
     function handleRegenerate() {
-        if (!feedbackInput.trim()) return;
+        const line = feedbackInput.trim();
+        if (!line) return;
         data.site.feedbackHistory = data.site.feedbackHistory || [];
-        data.site.feedbackHistory.push(feedbackInput.trim());
+        data.site.feedbackHistory.push(line);
         feedbackInput = "";
-        runGeneration();
+        runGeneration({ uiSummary: line });
     }
 
     function handleVote(slug: string) {
@@ -150,6 +254,10 @@
         window.addEventListener("keydown", onKeydown);
 
         void (async () => {
+            sessionStartedAt = Date.now();
+            lifetimeTotals = loadLifetimeTotals();
+            promptLog = loadPromptLog();
+
             const stored = localStorage.getItem("voted_sites");
             if (stored) {
                 try {
@@ -180,8 +288,17 @@
                         );
                     const styleData = await styleRes.json();
 
-                    if (styleData.stats)
+                    if (styleData.stats) {
                         siteState.generationStats.styleGuide = styleData.stats;
+                        const r = appendNerdPrompt({
+                            kind: "style-guide",
+                            summary: `Theme: ${styleData.themeWords}`,
+                            stats: styleData.stats,
+                            slug: styleData.slug,
+                        });
+                        lifetimeTotals = r.lifetime;
+                        promptLog = r.log;
+                    }
 
                     data.site.styleGuide = styleData.styleGuide;
                     data.site.slug = styleData.slug;
@@ -421,22 +538,77 @@
                     <X size={18} />
                 </button>
             </div>
-            {#if nerdsAggregate.parts.length === 0}
+            {#if !nerdsHasAnything}
                 <p class="nerds-empty">
                     No Gemini stats yet. Generate or regenerate the site to record
-                    token usage.
+                    token usage. Local lifetime totals and prompt history will
+                    appear here after your first successful call.
                 </p>
             {:else}
+                {#if lifetimeTotals.callCount > 0}
+                    <section class="nerds-lifetime">
+                        <h3>All time (this browser)</h3>
+                        <dl class="nerds-dl">
+                            <dt>Gemini calls recorded</dt>
+                            <dd>
+                                {lifetimeTotals.callCount.toLocaleString()}
+                            </dd>
+                            <dt>Total tokens (accumulated)</dt>
+                            <dd>
+                                {lifetimeTotals.totalTokens.toLocaleString()}
+                            </dd>
+                            <dt>Est. total spend</dt>
+                            <dd>{fmtUsd(lifetimeTotals.totalCostUsd)}</dd>
+                            {#if lifetimeTotals.lastUpdated}
+                                <dt>Last updated</dt>
+                                <dd>{fmtShortTime(lifetimeTotals.lastUpdated)}</dd>
+                            {/if}
+                        </dl>
+                    </section>
+                {/if}
+
+                {#if sessionStartedAt > 0 && promptLog.some((e) => new Date(e.at).getTime() >= sessionStartedAt)}
+                    <section class="nerds-session">
+                        <h3>This page visit</h3>
+                        <dl class="nerds-dl">
+                            <dt>UI generations (this visit)</dt>
+                            <dd>{sessionUiRegenerations.toLocaleString()}</dd>
+                            <dt>Tokens (this visit)</dt>
+                            <dd>
+                                {sessionVisitTokens.toLocaleString()}
+                            </dd>
+                            <dt>Est. cost (this visit)</dt>
+                            <dd>{fmtUsd(sessionVisitCost)}</dd>
+                        </dl>
+                    </section>
+                {/if}
+
                 <div class="nerds-sections">
                     {#if siteState.generationStats.styleGuide}
                         {@const s = siteState.generationStats.styleGuide}
                         <section>
                             <h3>Style guide call</h3>
                             <dl class="nerds-dl">
+                                {#if s.model}
+                                    <dt>Model</dt>
+                                    <dd class="nerds-mono">{s.model}</dd>
+                                {/if}
                                 <dt>Prompt tokens</dt>
                                 <dd>{s.promptTokenCount.toLocaleString()}</dd>
                                 <dt>Output tokens</dt>
                                 <dd>{s.candidatesTokenCount.toLocaleString()}</dd>
+                                {#if s.thoughtsTokenCount != null && s.thoughtsTokenCount > 0}
+                                    <dt>Thought tokens</dt>
+                                    <dd>
+                                        {s.thoughtsTokenCount.toLocaleString()}
+                                    </dd>
+                                {/if}
+                                {#if s.cachedContentTokenCount != null && s.cachedContentTokenCount > 0}
+                                    <dt>Cached content tokens</dt>
+                                    <dd>
+                                        {s.cachedContentTokenCount.toLocaleString()}
+                                    </dd>
+                                {/if}
                                 <dt>Total tokens</dt>
                                 <dd>{s.totalTokenCount.toLocaleString()}</dd>
                                 <dt>Wall time</dt>
@@ -457,10 +629,26 @@
                         <section>
                             <h3>UI generation (latest)</h3>
                             <dl class="nerds-dl">
+                                {#if s.model}
+                                    <dt>Model</dt>
+                                    <dd class="nerds-mono">{s.model}</dd>
+                                {/if}
                                 <dt>Prompt tokens</dt>
                                 <dd>{s.promptTokenCount.toLocaleString()}</dd>
                                 <dt>Output tokens</dt>
                                 <dd>{s.candidatesTokenCount.toLocaleString()}</dd>
+                                {#if s.thoughtsTokenCount != null && s.thoughtsTokenCount > 0}
+                                    <dt>Thought tokens</dt>
+                                    <dd>
+                                        {s.thoughtsTokenCount.toLocaleString()}
+                                    </dd>
+                                {/if}
+                                {#if s.cachedContentTokenCount != null && s.cachedContentTokenCount > 0}
+                                    <dt>Cached content tokens</dt>
+                                    <dd>
+                                        {s.cachedContentTokenCount.toLocaleString()}
+                                    </dd>
+                                {/if}
                                 <dt>Total tokens</dt>
                                 <dd>{s.totalTokenCount.toLocaleString()}</dd>
                                 <dt>Wall time</dt>
@@ -479,7 +667,7 @@
                 </div>
                 {#if nerdsAggregate.parts.length > 1}
                     <section class="nerds-combined">
-                        <h3>Combined (this session)</h3>
+                        <h3>Combined (latest snapshot)</h3>
                         <dl class="nerds-dl">
                             <dt>Total tokens</dt>
                             <dd>
@@ -499,10 +687,122 @@
                         </dl>
                     </section>
                 {/if}
+
+                {#if promptLog.length > 0}
+                    <section class="nerds-prompts">
+                        <div class="nerds-prompts-head">
+                            <h3>Prompt history</h3>
+                            <div class="nerds-seg" role="group" aria-label="Filter prompt log">
+                                <button
+                                    type="button"
+                                    class:active={nerdsLogFilter === "visit"}
+                                    onclick={() => (nerdsLogFilter = "visit")}
+                                >
+                                    This visit
+                                </button>
+                                <button
+                                    type="button"
+                                    class:active={nerdsLogFilter === "all"}
+                                    onclick={() => (nerdsLogFilter = "all")}
+                                >
+                                    All stored
+                                </button>
+                            </div>
+                        </div>
+                        <p class="nerds-prompts-hint">
+                            Each row is one API round-trip. Expand for the full
+                            label (theme, feedback line, or step description).
+                        </p>
+                        <ul class="nerds-prompt-list">
+                            {#if displayedPromptLog.length === 0}
+                                <li class="nerds-prompt-empty">
+                                    No entries for this filter.
+                                    {#if nerdsLogFilter === "visit" && promptLog.length > 0}
+                                        Switch to <strong>All stored</strong> to see
+                                        past runs from this browser.
+                                    {/if}
+                                </li>
+                            {:else}
+                                {#each displayedPromptLog as entry (entry.id)}
+                                <li class="nerds-prompt-item">
+                                    <button
+                                        type="button"
+                                        class="nerds-prompt-toggle"
+                                        class:open={nerdsExpandedId === entry.id}
+                                        onclick={() =>
+                                            (nerdsExpandedId =
+                                                nerdsExpandedId === entry.id
+                                                    ? null
+                                                    : entry.id)}
+                                        aria-expanded={nerdsExpandedId === entry.id}
+                                    >
+                                        <span
+                                            class="nerds-kind nerds-kind-{entry.kind}"
+                                            >{entry.kind === "style-guide"
+                                                ? "Style"
+                                                : "UI"}</span
+                                        >
+                                        <span class="nerds-prompt-meta">
+                                            {fmtShortTime(entry.at)} · {entry.stats.totalTokenCount.toLocaleString()}
+                                            tok
+                                        </span>
+                                        <span class="nerds-chevron" aria-hidden="true"
+                                            >{nerdsExpandedId === entry.id
+                                                ? "▾"
+                                                : "▸"}</span
+                                        >
+                                    </button>
+                                    {#if nerdsExpandedId !== entry.id}
+                                        <p class="nerds-prompt-preview">
+                                            {truncateSummary(entry.summary)}
+                                        </p>
+                                    {:else}
+                                        <pre class="nerds-prompt-body">{entry.summary}</pre>
+                                        <dl class="nerds-dl nerds-prompt-mini">
+                                            <dt>Slug</dt>
+                                            <dd class="nerds-mono">
+                                                {entry.slug ?? "—"}
+                                            </dd>
+                                            <dt>Prompt / out</dt>
+                                            <dd>
+                                                {entry.stats.promptTokenCount.toLocaleString()}
+                                                /
+                                                {entry.stats.candidatesTokenCount.toLocaleString()}
+                                            </dd>
+                                            {#if entry.stats.model}
+                                                <dt>Model</dt>
+                                                <dd class="nerds-mono">
+                                                    {entry.stats.model}
+                                                </dd>
+                                            {/if}
+                                        </dl>
+                                    {/if}
+                                </li>
+                                {/each}
+                            {/if}
+                        </ul>
+                    </section>
+                {/if}
+
+                <div class="nerds-actions">
+                    <button type="button" class="nerds-btn" onclick={copyNerdsExport}>
+                        Copy stats JSON
+                    </button>
+                    <button
+                        type="button"
+                        class="nerds-btn danger"
+                        onclick={resetLocalNerdData}
+                    >
+                        Clear local stats
+                    </button>
+                </div>
+
                 <p class="nerds-footnote">
                     {siteState.generationStats.ui?.pricingNote ??
                         siteState.generationStats.styleGuide?.pricingNote ??
-                        ""}
+                        (lifetimeTotals.callCount > 0
+                            ? "Costs are estimates from recorded usage metadata. "
+                            : "")}
                     <a
                         href="https://ai.google.dev/pricing"
                         target="_blank"
@@ -826,8 +1126,8 @@
         top: 50%;
         transform: translate(-50%, -50%);
         z-index: 10056;
-        width: min(420px, calc(100vw - 32px));
-        max-height: min(80vh, 560px);
+        width: min(560px, calc(100vw - 32px));
+        max-height: min(88vh, 720px);
         overflow: auto;
         padding: 20px 22px 18px;
         background: #fff;
@@ -906,6 +1206,222 @@
         font-variant-numeric: tabular-nums;
         color: #111;
         font-weight: 500;
+    }
+
+    .nerds-dl dd.nerds-mono {
+        font-size: 12px;
+        font-weight: 400;
+        word-break: break-all;
+    }
+
+    .nerds-lifetime,
+    .nerds-session {
+        margin-bottom: 18px;
+    }
+
+    .nerds-lifetime h3,
+    .nerds-session h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #666;
+    }
+
+    .nerds-prompts {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .nerds-prompts-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+
+    .nerds-prompts-head h3 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #666;
+    }
+
+    .nerds-seg {
+        display: inline-flex;
+        border-radius: 8px;
+        padding: 2px;
+        background: rgba(0, 0, 0, 0.06);
+        gap: 2px;
+    }
+
+    .nerds-seg button {
+        border: none;
+        background: transparent;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #555;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .nerds-seg button.active {
+        background: #fff;
+        color: #111;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .nerds-prompts-hint {
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: #666;
+        line-height: 1.4;
+    }
+
+    .nerds-prompt-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 280px;
+        overflow: auto;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+    }
+
+    .nerds-prompt-empty {
+        margin: 0;
+        padding: 16px 14px;
+        font-size: 13px;
+        color: #666;
+        line-height: 1.45;
+    }
+
+    .nerds-prompt-item {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .nerds-prompt-item:last-child {
+        border-bottom: none;
+    }
+
+    .nerds-prompt-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 10px 12px;
+        border: none;
+        background: rgba(0, 0, 0, 0.02);
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        font-size: 13px;
+    }
+
+    .nerds-prompt-toggle:hover {
+        background: rgba(0, 0, 0, 0.04);
+    }
+
+    .nerds-kind {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 3px 7px;
+        border-radius: 4px;
+    }
+
+    .nerds-kind-style-guide {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .nerds-kind-ui {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .nerds-prompt-meta {
+        flex: 1;
+        font-size: 11px;
+        color: #666;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .nerds-chevron {
+        flex-shrink: 0;
+        color: #888;
+        font-size: 12px;
+    }
+
+    .nerds-prompt-preview {
+        margin: 0;
+        padding: 0 12px 10px 12px;
+        font-size: 12px;
+        color: #444;
+        line-height: 1.45;
+    }
+
+    .nerds-prompt-body {
+        margin: 0 12px 10px;
+        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.45;
+        background: #f6f6f6;
+        border-radius: 8px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+            monospace;
+    }
+
+    .nerds-prompt-mini {
+        margin: 0 12px 12px;
+        font-size: 12px;
+    }
+
+    .nerds-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .nerds-btn {
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #fff;
+        color: #222;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .nerds-btn:hover {
+        background: rgba(0, 0, 0, 0.04);
+    }
+
+    .nerds-btn.danger {
+        border-color: rgba(180, 40, 40, 0.35);
+        color: #a32020;
+    }
+
+    .nerds-btn.danger:hover {
+        background: rgba(180, 40, 40, 0.06);
     }
 
     .nerds-combined {

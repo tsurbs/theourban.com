@@ -74,7 +74,7 @@ Reply ONLY with the raw JSON object. Do not include markdown formatting or expla
             ]
         });
         let styleContent = styleContentRaw;
-        const stats = buildGenerationCallStats(usage, Date.now() - t0);
+        const stats = buildGenerationCallStats(usage, Date.now() - t0, MODEL);
 
         // Clean up markdown block if the model included it
         if (styleContent.startsWith('```json')) {

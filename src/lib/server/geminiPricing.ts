@@ -17,7 +17,8 @@ export function estimateGemini31FlashLiteStandardUsd(usage: GeminiUsage): number
 
 export function buildGenerationCallStats(
 	usage: GeminiUsage | null,
-	durationMs: number
+	durationMs: number,
+	model?: string
 ): GenerationCallStats | null {
 	if (!usage) return null;
 	return {
@@ -26,6 +27,13 @@ export function buildGenerationCallStats(
 		totalTokenCount: usage.totalTokenCount,
 		durationMs,
 		estimatedCostUsd: estimateGemini31FlashLiteStandardUsd(usage),
-		pricingNote: PRICING_NOTE
+		pricingNote: PRICING_NOTE,
+		...(model ? { model } : {}),
+		...(typeof usage.cachedContentTokenCount === 'number'
+			? { cachedContentTokenCount: usage.cachedContentTokenCount }
+			: {}),
+		...(typeof usage.thoughtsTokenCount === 'number'
+			? { thoughtsTokenCount: usage.thoughtsTokenCount }
+			: {})
 	};
 }

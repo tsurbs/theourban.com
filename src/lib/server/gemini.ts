@@ -6,6 +6,8 @@ export type GeminiUsage = {
 	promptTokenCount: number;
 	candidatesTokenCount: number;
 	totalTokenCount: number;
+	cachedContentTokenCount?: number;
+	thoughtsTokenCount?: number;
 };
 
 export async function geminiGenerateContent(options: {
@@ -44,6 +46,8 @@ export async function geminiGenerateContent(options: {
 			promptTokenCount?: number;
 			candidatesTokenCount?: number;
 			totalTokenCount?: number;
+			cachedContentTokenCount?: number;
+			thoughtsTokenCount?: number;
 		};
 	};
 
@@ -59,7 +63,13 @@ export async function geminiGenerateContent(options: {
 			? {
 					promptTokenCount: u.promptTokenCount ?? 0,
 					candidatesTokenCount: u.candidatesTokenCount ?? 0,
-					totalTokenCount: u.totalTokenCount
+					totalTokenCount: u.totalTokenCount,
+					...(typeof u.cachedContentTokenCount === 'number'
+						? { cachedContentTokenCount: u.cachedContentTokenCount }
+						: {}),
+					...(typeof u.thoughtsTokenCount === 'number'
+						? { thoughtsTokenCount: u.thoughtsTokenCount }
+						: {})
 				}
 			: null;
 

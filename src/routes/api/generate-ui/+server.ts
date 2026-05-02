@@ -101,7 +101,7 @@ UI REQUIREMENTS:
 				: [{ role: 'user', content: 'Generate the portfolio SPA HTML exactly as specified in the system instructions.' }]
 		});
 		let generatedHtml = generatedHtmlRaw;
-		const stats = buildGenerationCallStats(usage, Date.now() - t0);
+		const stats = buildGenerationCallStats(usage, Date.now() - t0, MODEL);
 
 		if (generatedHtml.startsWith('```html')) {
 			generatedHtml = generatedHtml.replace(/^```html\n?/, '').replace(/\n?```$/, '');
