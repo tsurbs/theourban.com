@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { getNerdStatsForSiteSlug } from '$lib/server/siteGenerationEvents';
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const slug = params.slug;
@@ -10,6 +11,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	const dbSite = await db.query.site.findFirst({
 		where: eq(site.slug, slug),
 	});
+
+	const nerdGlobal = await getNerdStatsForSiteSlug(slug);
 
 	if (!dbSite) {
 		return {
@@ -24,6 +27,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
+			nerdGlobal,
 			...previewFrame,
 		};
 	}
@@ -31,6 +35,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	return {
 		isNew: false,
 		site: dbSite,
+		nerdGlobal,
 		...previewFrame,
 	};
 };

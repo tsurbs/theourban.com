@@ -8,6 +8,7 @@ import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { ensurePreviewContentSecurityPolicy, escapeHtmlForMailMerge } from '$lib/previewSecurity';
+import { insertSiteGenerationEvent } from '$lib/server/siteGenerationEvents';
 
 function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, string> } {
 	const mapping: Record<string, string> = {};
@@ -127,6 +128,19 @@ UI REQUIREMENTS:
 					updatedAt: new Date()
 				})
 				.where(eq(site.slug, slug));
+		}
+
+		if (stats && slug) {
+			const summary =
+				feedbackHistory.length > 0
+					? `Feedback: ${feedbackHistory[feedbackHistory.length - 1]}`
+					: 'Initial UI generation';
+			await insertSiteGenerationEvent({
+				siteSlug: slug,
+				kind: 'ui',
+				summary,
+				stats
+			});
 		}
 
 		return json({ html: generatedHtml, stats });

@@ -6,6 +6,7 @@ import { geminiGenerateContent } from '$lib/server/gemini';
 import { buildGenerationCallStats } from '$lib/server/geminiPricing';
 import { db } from '$lib/server/db';
 import { site } from '$lib/server/db/schema';
+import { insertSiteGenerationEvent } from '$lib/server/siteGenerationEvents';
 
 // Word lists for generating a 3-word phrase (adjective + adjective + noun)
 const adjectives = ['neon', 'vibrant', 'dark', 'minimal', 'brutalist', 'soft', 'sleek', 'bold', 'retro', 'modern', 'lucid', 'dreamy', 'stark', 'fluid', 'urban', 'cosmic', 'electric', 'pastel'];
@@ -101,6 +102,15 @@ Reply ONLY with the raw JSON object. Do not include markdown formatting or expla
                 updatedAt: new Date()
             }
         });
+
+        if (stats) {
+            await insertSiteGenerationEvent({
+                siteSlug: slug,
+                kind: 'style-guide',
+                summary: `Theme: ${themeWords}`,
+                stats
+            });
+        }
 
         return json({ slug, themeWords, styleGuide, stats });
 

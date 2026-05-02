@@ -3,21 +3,13 @@
     import { siteState } from "$lib/siteState.svelte";
     import type { GenerationCallStats } from "$lib/generationStats";
     import type { PageData } from "./$types";
+    import type { SiteNerdGlobalPayload } from "$lib/server/siteGenerationEvents";
     import Wand2 from "lucide-svelte/icons/wand-2";
     import X from "lucide-svelte/icons/x";
     import LayoutGrid from "lucide-svelte/icons/layout-grid";
     import ThumbsUp from "lucide-svelte/icons/thumbs-up";
     import { enhance } from "$app/forms";
     import { ensurePreviewContentSecurityPolicy } from "$lib/previewSecurity";
-    import {
-        appendNerdPrompt,
-        clearNerdLedger,
-        emptyLifetimeTotals,
-        loadLifetimeTotals,
-        loadPromptLog,
-        type LifetimeNerdTotals,
-        type NerdPromptLogEntry,
-    } from "$lib/nerdLedger";
 
     const CONTEXT_MSG = "theourban-contextmenu";
 
@@ -32,11 +24,27 @@
     let contextMenuX = $state(0);
     let contextMenuY = $state(0);
     let nerdsModalOpen = $state(false);
-    let lifetimeTotals = $state<LifetimeNerdTotals>(emptyLifetimeTotals());
-    let promptLog = $state<NerdPromptLogEntry[]>([]);
-    let sessionStartedAt = $state(0);
-    let nerdsLogFilter = $state<"visit" | "all">("visit");
+    let nerdGlobal = $state<SiteNerdGlobalPayload>(data.nerdGlobal);
     let nerdsExpandedId = $state<string | null>(null);
+
+    $effect(() => {
+        nerdGlobal = data.nerdGlobal;
+    });
+
+    async function refreshNerdGlobalFromServer() {
+        const slug = data.site.slug;
+        if (!slug) return;
+        try {
+            const r = await fetch(
+                `/api/sites/${encodeURIComponent(slug)}/nerd-stats`,
+            );
+            if (r.ok) {
+                nerdGlobal = (await r.json()) as SiteNerdGlobalPayload;
+            }
+        } catch (e) {
+            console.error("refresh nerd stats", e);
+        }
+    }
 
     function fmtUsd(n: number) {
         return n.toLocaleString(undefined, {
@@ -65,38 +73,10 @@
         return { parts, totalTokens, totalCost, totalMs, sec, tpsCombined };
     });
 
-    const displayedPromptLog = $derived(
-        nerdsLogFilter === "visit"
-            ? promptLog.filter(
-                  (e) => new Date(e.at).getTime() >= sessionStartedAt,
-              )
-            : promptLog,
-    );
-
-    const sessionVisitTokens = $derived(
-        promptLog
-            .filter((e) => new Date(e.at).getTime() >= sessionStartedAt)
-            .reduce((a, e) => a + e.stats.totalTokenCount, 0),
-    );
-
-    const sessionVisitCost = $derived(
-        promptLog
-            .filter((e) => new Date(e.at).getTime() >= sessionStartedAt)
-            .reduce((a, e) => a + e.stats.estimatedCostUsd, 0),
-    );
-
-    const sessionUiRegenerations = $derived(
-        promptLog.filter(
-            (e) =>
-                e.kind === "ui" &&
-                new Date(e.at).getTime() >= sessionStartedAt,
-        ).length,
-    );
-
     const nerdsHasAnything = $derived(
         nerdsAggregate.parts.length > 0 ||
-            lifetimeTotals.callCount > 0 ||
-            promptLog.length > 0,
+            nerdGlobal.aggregates.callCount > 0 ||
+            nerdGlobal.recentEvents.length > 0,
     );
 
     function truncateSummary(s: string, max = 140) {
@@ -123,20 +103,12 @@
         const payload = {
             exportedAt: new Date().toISOString(),
             slug: data.site.slug,
-            lifetimeBrowser: lifetimeTotals,
-            promptHistory: promptLog,
-            latestSnapshot: siteState.generationStats,
+            allUsersThisSite: nerdGlobal,
+            yourLatestSnapshot: siteState.generationStats,
         };
         void navigator.clipboard?.writeText(
             JSON.stringify(payload, null, 2),
         );
-    }
-
-    function resetLocalNerdData() {
-        clearNerdLedger();
-        lifetimeTotals = emptyLifetimeTotals();
-        promptLog = [];
-        nerdsExpandedId = null;
     }
 
     function openContextMenuAt(clientX: number, clientY: number) {
@@ -155,9 +127,10 @@
     function openNerdsModal() {
         nerdsModalOpen = true;
         contextMenuOpen = false;
+        void refreshNerdGlobalFromServer();
     }
 
-    async function runGeneration(opts?: { uiSummary?: string }) {
+    async function runGeneration() {
         const abortController = new AbortController();
         try {
             loading = true;
@@ -187,24 +160,12 @@
 
             if (uiData.stats) {
                 siteState.generationStats.ui = uiData.stats;
-                const summary =
-                    opts?.uiSummary ??
-                    (data.site.feedbackHistory?.length
-                        ? `Feedback: ${data.site.feedbackHistory[data.site.feedbackHistory.length - 1]}`
-                        : "Initial UI generation");
-                const r = appendNerdPrompt({
-                    kind: "ui",
-                    summary,
-                    stats: uiData.stats,
-                    slug: data.site.slug,
-                });
-                lifetimeTotals = r.lifetime;
-                promptLog = r.log;
             }
 
             siteState.generatedHtml = uiData.html;
             siteState.hasGenerated = true;
             loading = false;
+            await refreshNerdGlobalFromServer();
         } catch (err) {
             if ((err as Error).name === "AbortError") return;
             console.error("Error in generation flow:", err);
@@ -219,7 +180,7 @@
         data.site.feedbackHistory = data.site.feedbackHistory || [];
         data.site.feedbackHistory.push(line);
         feedbackInput = "";
-        runGeneration({ uiSummary: line });
+        runGeneration();
     }
 
     function handleVote(slug: string) {
@@ -254,10 +215,6 @@
         window.addEventListener("keydown", onKeydown);
 
         void (async () => {
-            sessionStartedAt = Date.now();
-            lifetimeTotals = loadLifetimeTotals();
-            promptLog = loadPromptLog();
-
             const stored = localStorage.getItem("voted_sites");
             if (stored) {
                 try {
@@ -290,19 +247,12 @@
 
                     if (styleData.stats) {
                         siteState.generationStats.styleGuide = styleData.stats;
-                        const r = appendNerdPrompt({
-                            kind: "style-guide",
-                            summary: `Theme: ${styleData.themeWords}`,
-                            stats: styleData.stats,
-                            slug: styleData.slug,
-                        });
-                        lifetimeTotals = r.lifetime;
-                        promptLog = r.log;
                     }
 
                     data.site.styleGuide = styleData.styleGuide;
                     data.site.slug = styleData.slug;
 
+                    await refreshNerdGlobalFromServer();
                     runGeneration();
                 } catch (err) {
                     console.error(err);
@@ -528,7 +478,16 @@
             tabindex="-1"
         >
             <div class="nerds-modal-header">
-                <h2 id="nerds-title">Stats for nerds</h2>
+                <div class="nerds-modal-title-wrap">
+                    <h2 id="nerds-title">Stats for nerds</h2>
+                    {#if data.site.slug}
+                        <p class="nerds-modal-slug">
+                            Site <code>/{data.site.slug}</code> — global totals
+                            and history below are pooled from the database across
+                            all visitors (anonymized; no accounts).
+                        </p>
+                    {/if}
+                </div>
                 <button
                     type="button"
                     class="nerds-close"
@@ -540,45 +499,33 @@
             </div>
             {#if !nerdsHasAnything}
                 <p class="nerds-empty">
-                    No Gemini stats yet. Generate or regenerate the site to record
-                    token usage. Local lifetime totals and prompt history will
-                    appear here after your first successful call.
+                    No Gemini stats yet for <code>/{data.site.slug || "…"}</code>.
+                    After generations run, this panel shows totals and a shared
+                    prompt log from the server for everyone who visits this slug.
                 </p>
             {:else}
-                {#if lifetimeTotals.callCount > 0}
+                {#if nerdGlobal.aggregates.callCount > 0}
                     <section class="nerds-lifetime">
-                        <h3>All time (this browser)</h3>
+                        <h3>All visitors (this site)</h3>
                         <dl class="nerds-dl">
                             <dt>Gemini calls recorded</dt>
                             <dd>
-                                {lifetimeTotals.callCount.toLocaleString()}
+                                {nerdGlobal.aggregates.callCount.toLocaleString()}
                             </dd>
-                            <dt>Total tokens (accumulated)</dt>
+                            <dt>Total tokens (all users)</dt>
                             <dd>
-                                {lifetimeTotals.totalTokens.toLocaleString()}
+                                {nerdGlobal.aggregates.totalTokens.toLocaleString()}
                             </dd>
-                            <dt>Est. total spend</dt>
-                            <dd>{fmtUsd(lifetimeTotals.totalCostUsd)}</dd>
-                            {#if lifetimeTotals.lastUpdated}
-                                <dt>Last updated</dt>
-                                <dd>{fmtShortTime(lifetimeTotals.lastUpdated)}</dd>
+                            <dt>Est. total spend (all users)</dt>
+                            <dd>{fmtUsd(nerdGlobal.aggregates.totalCostUsd)}</dd>
+                            {#if nerdGlobal.aggregates.lastEventAt}
+                                <dt>Most recent event</dt>
+                                <dd>
+                                    {fmtShortTime(
+                                        nerdGlobal.aggregates.lastEventAt,
+                                    )}
+                                </dd>
                             {/if}
-                        </dl>
-                    </section>
-                {/if}
-
-                {#if sessionStartedAt > 0 && promptLog.some((e) => new Date(e.at).getTime() >= sessionStartedAt)}
-                    <section class="nerds-session">
-                        <h3>This page visit</h3>
-                        <dl class="nerds-dl">
-                            <dt>UI generations (this visit)</dt>
-                            <dd>{sessionUiRegenerations.toLocaleString()}</dd>
-                            <dt>Tokens (this visit)</dt>
-                            <dd>
-                                {sessionVisitTokens.toLocaleString()}
-                            </dd>
-                            <dt>Est. cost (this visit)</dt>
-                            <dd>{fmtUsd(sessionVisitCost)}</dd>
                         </dl>
                     </section>
                 {/if}
@@ -587,7 +534,7 @@
                     {#if siteState.generationStats.styleGuide}
                         {@const s = siteState.generationStats.styleGuide}
                         <section>
-                            <h3>Style guide call</h3>
+                            <h3>Your latest style guide call</h3>
                             <dl class="nerds-dl">
                                 {#if s.model}
                                     <dt>Model</dt>
@@ -627,7 +574,7 @@
                     {#if siteState.generationStats.ui}
                         {@const s = siteState.generationStats.ui}
                         <section>
-                            <h3>UI generation (latest)</h3>
+                            <h3>Your latest UI generation</h3>
                             <dl class="nerds-dl">
                                 {#if s.model}
                                     <dt>Model</dt>
@@ -667,7 +614,7 @@
                 </div>
                 {#if nerdsAggregate.parts.length > 1}
                     <section class="nerds-combined">
-                        <h3>Combined (latest snapshot)</h3>
+                        <h3>Your combined snapshot (this tab)</h3>
                         <dl class="nerds-dl">
                             <dt>Total tokens</dt>
                             <dd>
@@ -688,42 +635,18 @@
                     </section>
                 {/if}
 
-                {#if promptLog.length > 0}
+                {#if nerdGlobal.recentEvents.length > 0}
                     <section class="nerds-prompts">
                         <div class="nerds-prompts-head">
-                            <h3>Prompt history</h3>
-                            <div class="nerds-seg" role="group" aria-label="Filter prompt log">
-                                <button
-                                    type="button"
-                                    class:active={nerdsLogFilter === "visit"}
-                                    onclick={() => (nerdsLogFilter = "visit")}
-                                >
-                                    This visit
-                                </button>
-                                <button
-                                    type="button"
-                                    class:active={nerdsLogFilter === "all"}
-                                    onclick={() => (nerdsLogFilter = "all")}
-                                >
-                                    All stored
-                                </button>
-                            </div>
+                            <h3>Recent generations (all visitors)</h3>
                         </div>
                         <p class="nerds-prompts-hint">
-                            Each row is one API round-trip. Expand for the full
-                            label (theme, feedback line, or step description).
+                            Newest first (up to 80 rows). Summaries may include
+                            theme titles or feedback text submitted with a
+                            regenerate.
                         </p>
                         <ul class="nerds-prompt-list">
-                            {#if displayedPromptLog.length === 0}
-                                <li class="nerds-prompt-empty">
-                                    No entries for this filter.
-                                    {#if nerdsLogFilter === "visit" && promptLog.length > 0}
-                                        Switch to <strong>All stored</strong> to see
-                                        past runs from this browser.
-                                    {/if}
-                                </li>
-                            {:else}
-                                {#each displayedPromptLog as entry (entry.id)}
+                            {#each nerdGlobal.recentEvents as entry (entry.id)}
                                 <li class="nerds-prompt-item">
                                     <button
                                         type="button"
@@ -743,7 +666,7 @@
                                                 : "UI"}</span
                                         >
                                         <span class="nerds-prompt-meta">
-                                            {fmtShortTime(entry.at)} · {entry.stats.totalTokenCount.toLocaleString()}
+                                            {fmtShortTime(entry.createdAt)} · {entry.totalTokenCount.toLocaleString()}
                                             tok
                                         </span>
                                         <span class="nerds-chevron" aria-hidden="true"
@@ -761,25 +684,24 @@
                                         <dl class="nerds-dl nerds-prompt-mini">
                                             <dt>Slug</dt>
                                             <dd class="nerds-mono">
-                                                {entry.slug ?? "—"}
+                                                {entry.siteSlug}
                                             </dd>
                                             <dt>Prompt / out</dt>
                                             <dd>
-                                                {entry.stats.promptTokenCount.toLocaleString()}
+                                                {entry.promptTokenCount.toLocaleString()}
                                                 /
-                                                {entry.stats.candidatesTokenCount.toLocaleString()}
+                                                {entry.candidatesTokenCount.toLocaleString()}
                                             </dd>
-                                            {#if entry.stats.model}
+                                            {#if entry.model}
                                                 <dt>Model</dt>
                                                 <dd class="nerds-mono">
-                                                    {entry.stats.model}
+                                                    {entry.model}
                                                 </dd>
                                             {/if}
                                         </dl>
                                     {/if}
                                 </li>
-                                {/each}
-                            {/if}
+                            {/each}
                         </ul>
                     </section>
                 {/if}
@@ -788,20 +710,13 @@
                     <button type="button" class="nerds-btn" onclick={copyNerdsExport}>
                         Copy stats JSON
                     </button>
-                    <button
-                        type="button"
-                        class="nerds-btn danger"
-                        onclick={resetLocalNerdData}
-                    >
-                        Clear local stats
-                    </button>
                 </div>
 
                 <p class="nerds-footnote">
                     {siteState.generationStats.ui?.pricingNote ??
                         siteState.generationStats.styleGuide?.pricingNote ??
-                        (lifetimeTotals.callCount > 0
-                            ? "Costs are estimates from recorded usage metadata. "
+                        (nerdGlobal.aggregates.callCount > 0
+                            ? "Server totals are sums of recorded usage metadata across all sessions. "
                             : "")}
                     <a
                         href="https://ai.google.dev/pricing"
@@ -1139,10 +1054,15 @@
 
     .nerds-modal-header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 16px;
+    }
+
+    .nerds-modal-title-wrap {
+        flex: 1;
+        min-width: 0;
     }
 
     .nerds-modal-header h2 {
@@ -1150,6 +1070,20 @@
         font-size: 18px;
         font-weight: 600;
         color: #111;
+    }
+
+    .nerds-modal-slug {
+        margin: 6px 0 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #666;
+    }
+
+    .nerds-modal-slug code {
+        font-size: 11px;
+        background: rgba(0, 0, 0, 0.06);
+        padding: 2px 6px;
+        border-radius: 4px;
     }
 
     .nerds-close {
@@ -1214,13 +1148,11 @@
         word-break: break-all;
     }
 
-    .nerds-lifetime,
-    .nerds-session {
+    .nerds-lifetime {
         margin-bottom: 18px;
     }
 
-    .nerds-lifetime h3,
-    .nerds-session h3 {
+    .nerds-lifetime h3 {
         margin: 0 0 10px;
         font-size: 13px;
         font-weight: 600;
@@ -1253,32 +1185,6 @@
         color: #666;
     }
 
-    .nerds-seg {
-        display: inline-flex;
-        border-radius: 8px;
-        padding: 2px;
-        background: rgba(0, 0, 0, 0.06);
-        gap: 2px;
-    }
-
-    .nerds-seg button {
-        border: none;
-        background: transparent;
-        padding: 6px 10px;
-        font-size: 12px;
-        font-weight: 500;
-        color: #555;
-        border-radius: 6px;
-        cursor: pointer;
-        font-family: inherit;
-    }
-
-    .nerds-seg button.active {
-        background: #fff;
-        color: #111;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-    }
-
     .nerds-prompts-hint {
         margin: 0 0 12px;
         font-size: 12px;
@@ -1294,14 +1200,6 @@
         overflow: auto;
         border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 10px;
-    }
-
-    .nerds-prompt-empty {
-        margin: 0;
-        padding: 16px 14px;
-        font-size: 13px;
-        color: #666;
-        line-height: 1.45;
     }
 
     .nerds-prompt-item {
@@ -1413,15 +1311,6 @@
 
     .nerds-btn:hover {
         background: rgba(0, 0, 0, 0.04);
-    }
-
-    .nerds-btn.danger {
-        border-color: rgba(180, 40, 40, 0.35);
-        color: #a32020;
-    }
-
-    .nerds-btn.danger:hover {
-        background: rgba(180, 40, 40, 0.06);
     }
 
     .nerds-combined {
