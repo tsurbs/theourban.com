@@ -851,7 +851,8 @@
         display: flex;
         flex-direction: column;
         gap: 15px;
-        z-index: 10000;
+        /* Above the fullscreen iframe sibling (same parent z-index fights); stay below overlays at 10050+ */
+        z-index: 10049;
         animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 

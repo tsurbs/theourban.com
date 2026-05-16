@@ -393,9 +393,14 @@
     .card-wrapper {
         position: relative;
         transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* Keeps thumbs button above sticky filter-controls (z-index 100) when cards scroll underneath */
+        z-index: 1;
+        isolation: isolate;
     }
 
-    .card-wrapper:hover {
+    .card-wrapper:is(:hover, :focus-within) {
+        /* Above .filter-controls (z-index 100) so thumbs / links work when scrolled under sticky bar */
+        z-index: 110;
         transform: translateY(-8px);
     }
 
@@ -412,7 +417,7 @@
         flex-direction: column;
     }
 
-    .card-wrapper:hover .site-card {
+    .card-wrapper:is(:hover, :focus-within) .site-card {
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
     }
 
