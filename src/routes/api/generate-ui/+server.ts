@@ -10,28 +10,39 @@ import { eq } from 'drizzle-orm';
 import { ensurePreviewContentSecurityPolicy, escapeHtmlForMailMerge } from '$lib/previewSecurity';
 import { insertSiteGenerationEvent } from '$lib/server/siteGenerationEvents';
 
-function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, string> } {
-	const mapping: Record<string, string> = {};
+// Keys whose string values are authored as HTML fragments in content.json and
+// should be merged in as-is (not HTML-escaped) so paragraphs, lists, links,
+// <i>/<sub>/<sup>, and named entities like &Sigma; render rather than appear
+// as literal text. Extend this set if new HTML-bearing fields are added.
+const HTML_VALUE_KEYS: ReadonlySet<string> = new Set(['content']);
+
+type MergeEntry = { value: string; isHtml: boolean };
+
+function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT_VAR_'): { template: Record<string, unknown>, mapping: Record<string, MergeEntry> } {
+	const mapping: Record<string, MergeEntry> = {};
 	let counter = 0;
 
-	function walk(val: unknown): unknown {
+	function walk(val: unknown, parentKey?: string): unknown {
 		if (typeof val === 'string') {
 			const isLikelyPath = val.startsWith('/') || val.startsWith('http');
 			if (!isLikelyPath && val.length > 0) {
 				const id = `${prefix}${counter++}`;
-				mapping[id] = val;
+				mapping[id] = {
+					value: val,
+					isHtml: parentKey != null && HTML_VALUE_KEYS.has(parentKey)
+				};
 				return `[[${id}]]`;
 			}
 			return val;
 		}
 		if (Array.isArray(val)) {
-			return val.map(walk);
+			return val.map((item) => walk(item, parentKey));
 		}
 		if (val !== null && typeof val === 'object') {
 			const newObj: Record<string, unknown> = {};
 			const typedVal = val as Record<string, unknown>;
 			for (const key in typedVal) {
-				newObj[key] = walk(typedVal[key]);
+				newObj[key] = walk(typedVal[key], key);
 			}
 			return newObj;
 		}
@@ -39,6 +50,46 @@ function createMailMerge(obj: Record<string, unknown>, prefix: string = 'CONTENT
 	}
 
 	return { template: walk(obj) as Record<string, unknown>, mapping };
+}
+
+/**
+ * Decide whether a given placeholder occurrence is in an HTML text-node
+ * context (between tags) vs. an unsafe-for-raw-HTML context (inside an
+ * attribute value, inside <script>/<style>/<title>, etc.).
+ *
+ * Heuristics, scanning the document up to `index`:
+ *  - If we're inside <script>, <style>, or <title> (no closing tag yet for the
+ *    most recent opener) → not text-node.
+ *  - Else, find the last unquoted '<' or '>' before `index`. If '>' wins, we
+ *    are between tags → text-node. If '<' wins, we are inside a tag (attrs).
+ */
+function isHtmlTextNodeContext(html: string, index: number): boolean {
+	const upto = html.slice(0, index);
+	const lowered = upto.toLowerCase();
+
+	for (const tag of ['script', 'style', 'title']) {
+		const openIdx = lowered.lastIndexOf(`<${tag}`);
+		if (openIdx === -1) continue;
+		const closeIdx = lowered.lastIndexOf(`</${tag}`);
+		if (closeIdx < openIdx) return false;
+	}
+
+	const lastGt = upto.lastIndexOf('>');
+	const lastLt = upto.lastIndexOf('<');
+	if (lastLt === -1) return true;
+	return lastGt > lastLt;
+}
+
+function mergePlaceholders(html: string, mapping: Record<string, MergeEntry>): string {
+	const placeholderRe = /\[\[(CONTENT_VAR_\d+)\]\]/g;
+	return html.replace(placeholderRe, (match, id: string, offset: number) => {
+		const entry = mapping[id];
+		if (!entry) return match;
+		if (entry.isHtml && isHtmlTextNodeContext(html, offset)) {
+			return entry.value;
+		}
+		return escapeHtmlForMailMerge(entry.value);
+	});
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -81,6 +132,11 @@ ${styleGuide ? `STYLE GUIDE: Follow these branding rules strictly: ${JSON.string
 ${oldHtml ? `CURRENT UI (Reference this for edits): [HTML provided below]` : ''}
 ${feedbackHistory.length > 0 ? `CRITICAL USER FEEDBACK HISTORY (Apply these changes/requests): ${feedbackHistory.join(' | ')}` : ''}
 
+RICH TEXT FIELDS:
+The \`content\` field on each page is PRE-RENDERED HTML (paragraphs, lists, links, <i>, <sub>, <sup>, HTML entities, etc.). You MUST render it as HTML, never as plain text.
+- Preferred: place the \`[[CONTENT_VAR_*]]\` placeholder for a page's \`content\` DIRECTLY inside an HTML element in the document body (e.g. <div class="page-body">[[CONTENT_VAR_17]]</div>). Do NOT put a content placeholder inside an HTML attribute, <title>, <script>, or any JS string literal.
+- If you must store pages in JS for SPA routing, store the OTHER fields (title, slug, tags, cover_image) in JS, but keep each page's \`content\` placeholder inside a hidden HTML template element (e.g. <template data-page="scottylabs">[[CONTENT_VAR_17]]</template>) and clone/insert it with innerHTML / template.content when that page is shown. Never assign a content placeholder to .textContent.
+
 UI REQUIREMENTS:
 1. Include a navigation menu that links to all pages. 
 2. The site must be a TRUE Single Page Application: Navigation MUST NOT change the browser URL or cause a page reload. Use internal state (e.g., showing/hiding divs) or URL hashes (e.g., #about-me) to handle navigation.
@@ -110,13 +166,12 @@ UI REQUIREMENTS:
 			generatedHtml = generatedHtml.replace(/^```\n?/, '').replace(/\n?```$/, '');
 		}
 
-		// MAIL MERGE: Replace placeholders with actual content
-		for (const [id, value] of Object.entries(mapping)) {
-			const placeholder = `[[${id}]]`;
-			const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			const regex = new RegExp(escapedPlaceholder, 'g');
-			generatedHtml = generatedHtml.replace(regex, escapeHtmlForMailMerge(value));
-		}
+		// MAIL MERGE: Replace placeholders with actual content. HTML-bearing
+		// fields (see HTML_VALUE_KEYS) inject raw markup only when the
+		// placeholder lands in an HTML text-node context; in attribute / JS
+		// string / <title> / <script> / <style> contexts we fall back to
+		// escaping so we never break surrounding syntax.
+		generatedHtml = mergePlaceholders(generatedHtml, mapping);
 
 		generatedHtml = ensurePreviewContentSecurityPolicy(generatedHtml);
 
