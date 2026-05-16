@@ -38,7 +38,7 @@
             "priority": "1",
             "cover_image": "/pages/scottylabs.png",
             "slug": "scottylabs",
-            "content": "<p>This is the ScottyLabs page content.</p>"
+            "content": "<p>ScottyLabs is CMU's largest and premier software engineering organization. We started in 2011 to run TartanHacks, which is still CMU's largest hackathon. Bringing together builders on campus lead to the creation of CMUEats.com, CMUCourses.com, CMUMaps.com, and many more software services built by students, to solve students’ problems. We meet every Saturday, and occasionally for fun GBMs during the week.</p><p>We have an interesting structure built to reinforce our increasingly interdisciplinary club — 6 committees and a Program, outlined below, work together to serve the student body.</p><p>I started in Labrador my Sophomore Fall, which happened to be the first year Labrador existed. Labrador was created to be an incubator for new ScottyLabs projects and People. In me, it was successful at both. I worked on, and then was briefly the tech lead for what is now CMUMaps.com. The Parsing (Floorplan PDF → Graph), Pathfinding, and hyperfast text search systems we created for CMUMaps are still some of my favorite pieces of software I’ve written. I had a lot to learn about leadership and the SWE principles that have taken CMUMaps to the reliable, well-built beast it is today.</p><p>My time as a Tech Lead was cut short as I was elected Director of Labrador midway through that Spring semester. As Director of Labrador, I worked to solidify the program’s second iteration through providing more support to members, better PM principles, and Boilerplate code. I also selected for scalable practices, growing to 60 active members working on ~10 projects. Some projects are still working, some deployed, and some sit in github archives, marking learning without a polished result.</p><p>Seeing the club as a bigger picture working with the Exec committee made me realize that ScottyLabs had become much more than a place I went on Saturdays — the people and the energy in ScottyLabs made it feel like a home. So, I ran for Director of ScottyLabs with a goal to develop sustainable growth practices, tighten our community, and explore new initiatives.</p><p>The Director of ScottyLabs is a weird position in a lot of ways, but for me mostly because if you’re doing your job well, you probably aren’t personally “doing” much. You’re not writing code, spending time in figma, planning events. You’re making the best possible environment for other people to do that in, removing bottlenecks and only doing real work when its a blocker. I won’t go into all of my reflections from this year but I’ll end this with some of the major things that our incredible team pulled off this year.</p><ul><li>Revamped the ScottyLabs Design System</li><li>Revamped ScottyLabs Sponsor Packet</li><li>Designed, Developed, Deployed O-Quest, an interactive game for orientation week</li><li>Launched Foundry, 3/9 teams in cohort 1 raised ~2M in funding</li><li>400 Applications to ScottyLabs</li><li>50 Teams submitted Nova, our 2-year-old GenAI hackathon</li><li>TartanHacks grew to &gt;2000 applications and &gt;1000 hackers, retained to &gt;800 people with submitted projects</li><li>Expanded foundry to 15 undergrad, grad, and faculty teams, 30 top VCs</li><li>Raised $xxx,xxx in sponsorship from top firms</li></ul>"
         },
         {
             "title": "CMUMaps",
@@ -49,7 +49,7 @@
             "priority": "2",
             "cover_image": "/pages/cmumaps.png",
             "slug": "cmumaps",
-            "content": "<p>This is the CMUMaps page content.</p>"
+            "content": "<p>CMU is a small but genuinely complicated campus — packed into just a few square miles are so many buildings, steep hills, and a maze of bridges that make “just walking there” harder than it should be. I started working on CMUMaps my sophomore year in ScottyLabs’ then-new Labrador committee, kicking off by “Google-mapsifying” an existing static map codebase and scraping room availability and dining information from CMU resources.</p><p>Once that foundation was in place, I moved to the much harder problem: room-to-room navigation. That work meant turning campus into a graph, building a k-means style approach to find centerlines through arbitrary shapes, and writing parsing pipelines to pull polygons and doors out of floorplan PDFs.</p><p>I also learned, the hard way, what it takes to work cross-functionally with a team of five designers. As a newer developer, our Figma mockups far exceeded what we could realistically ship — but the gap taught me a lot about scoping, communication, and translating good design into a solid product.</p><p>At the end, our system design was a mess, so when I handed off the project to my good friend Yuxiang Huang, he was appropriately upset and spent the next year hardening it into a concise and far more functional verison.</p><p>This modularity also gave me the opportunity to dive into optimizing a part I really wanted to: the search engine — I wrote a blazing fast BM25 search engine for the rooms and assets on campus (in rust, &lt;100ms round trip to the lambda). This was a really interesting opportunity to delve into some specific data structures and also optimize at the systems level, managing how memory is loaded with a very direct mandate to minimize latency. Then, I also rewrote the graph search (pathfinding) algorithm in rust to put it in an aws lambda to capture similar benefits.</p>"
         },
         {
             "title": "Capital One",
@@ -59,7 +59,7 @@
             "priority": "3",
             "cover_image": "/pages/capital-one.png",
             "slug": "capital-one",
-            "content": "<p>This is the Capital One page content.</p>"
+            "content": "<p>During my summer at Capital One, I worked with a tight-knit team of five to tackle a problem that I never saw except at the scale of Capital One — the cost of downstream data conflict incidents. Our task was to shift data validation left, which meant building a brand new Data Contracts system from the ground up. Since developers use many different languages and stacks with varying levels of type safety, we needed to create 1) a system for tracking all kinds of breaking changes to data made by producers and 2) a governance policy granting data consumers guarantees on when their data will and will not change.</p><p>This project involved a full-stack application, a dedicated notification service, and pipeline integrations tying it all together. We used a stack I was relatively familiar with, in a pipeline that is much larger than everything I’ve seen. A system like this can drive roughly a 100x reduction in incident costs. It was extremely rewarding to work with an interesting team of peers advised by current capital one employees and the whole experience really helped me understand the big tech environment.</p>"
         },
         {
             "title": "Lazarus AI",
@@ -69,17 +69,7 @@
             "priority": "4",
             "cover_image": "/pages/lazarus-ai.png",
             "slug": "lazarus-ai",
-            "content": "<p>This is the Lazarus AI page content.</p>"
-        },
-        {
-            "title": "O-Quest",
-            "tags": [
-                "Misc."
-            ],
-            "priority": "5",
-            "cover_image": "/pages/o-quest.png",
-            "slug": "o-quest",
-            "content": "<p>This is the O-Quest page content.</p>"
+            "content": "<p>During my time at <a href=\"https://lazarusai.com\">Lazarus AI</a>, I worked on a variety of tasks based on where I was needed at any moment. On my first day, I pushed observability improvements to the core RAG microservice, and continued that throughout the summer. Our task was to stabilize the system, which meant building out rigorous performance testing, hitting over 90% unit test coverage with extensive custom DB mocking, and wiring up persistent logging and at-least-once backups facilitating easy recovery. This was also my first time seeing a really legit stack including FastAPI, ChromaDB, Redis, GCP, PostgreSQL, and Docker.</p><p>I also worked on the re-architecture of our access control system, as we developed a custom approach to ABAC for customer data based on the group structure of our particular clients. We ran into some fun bugs here too around non-ascii characters….</p><p>This role also showed me the importance of working with product and marketing to make meaningful changes. They needed a way to showcase our vector database at scale, so I worked with our team to redesign our embedding visualizations so they were meaningful AND interesting.</p>"
         },
         {
             "title": "15-281 TA",
@@ -89,7 +79,7 @@
             "priority": "6",
             "cover_image": "/pages/15-281-ta.png",
             "slug": "15-281-ta",
-            "content": "<p>This is the 15-281 TA page content.</p>"
+            "content": "<p>I was a TA for 15-281, the (now-deprecated) intro AI course at CMU. I started doing it because I loved the course's approach to teaching AI through a classical lens and found a lot of value in the game-playing emphasis. We covered an extremely interesting (I think) cross-section of cs and AI concepts, and I often got to be the student's first introduction to them.</p><p>These topics included: Search, Constraint Satisfaction Problems, Integer Programming, Local Search, Classical Planning, MDPs + RL, Bayes Nets, Game Theory, and Social Choice.</p><p>I really enjoyed working with the other course staff -- the other TAs and professors Pat Virtue, and Vincent Conitzer + Tuomas Sandholm, whom I co-head-ta'd under. It was a really great experience to work with them and learn from them.</p><p>I also learned a lot by practicing teaching, really starting to understand how other people think and process through material.  By seeing the same material pass through many different minds, I got to see how different people understand and internalize it, and iterate on an approach that worked for everyone.</p>"
         },
         {
             "title": "Running",
@@ -99,7 +89,7 @@
             "priority": "7",
             "cover_image": "/pages/running.png",
             "slug": "running",
-            "content": "<p>This is the Running page content.</p>"
+            "content": "<p>I love running lol -- see my <a href=\"https://www.strava.com/athletes/44903891\">Strava page</a>.</p>"
         },
         {
             "title": "Trellis Problem",
@@ -109,7 +99,7 @@
             "priority": "8",
             "cover_image": "/pages/trellis-problem.png",
             "slug": "trellis-problem",
-            "content": "<p>This is the Trellis Problem page content.</p>"
+            "content": "<p>This was a fun CS / Abstract Algebra problem I worked on in Computational Discrete Math under Klaus Sutner. Here's a teaser below, and a link <a href=\"https://utfs.io/f/sV8Imy5qB0jLkY2UPNKcSkFLQHwaRKIhJqeXC9AlU2tuW1oG\">to the paper</a>.</p><p>We want to show that the trellis automaton specified in the problem is based on a group action of some group <i>G</i> with carrier set &Sigma;<sup>*</sup> (&Sigma; = {<i>a</i>, <i>b</i>, <i>c</i>}) on <i>X</i> = {0, 1}<sup>8</sup>, the set of all configurations of the 1x2 trellis (we can fix alphabetical order based on the letters in the picture above). Specifically, we can let &alpha;(<i>x</i>, &sigma;<i>s</i>) = &alpha;(<i>x&#39;</i>, <i>s</i>) for <i>s</i> &in; <i>G</i>, &sigma; &in; {<i>a</i>, <i>b</i>, <i>c</i>} where <i>x&#39;</i> is the result of dropping a ball in the slot given by &sigma;, and &alpha;(<i>x</i>, &epsilon;) = <i>x</i>.</p><p>We need to satisfy two constraints for this to be a group action. First, &alpha;(<i>x</i>, &epsilon;) = <i>x</i>, which is true by definition. Second, &alpha;(&alpha;(<i>x</i>, <i>g</i>), <i>h</i>) = &alpha;(<i>x</i>, <i>gh</i>). This is true because each step of &alpha; pulls off one character from <i>gh</i>, so it achieves &alpha;(<i>x</i>, <i>g</i>) in both cases, and then applies each letter in <i>h</i>.</p>"
         },
         {
             "title": "Style Transfer",
@@ -119,7 +109,7 @@
             "priority": "9",
             "cover_image": "/pages/style-transfer.png",
             "slug": "style-transfer",
-            "content": "<p>This is the Style Transfer page content.</p>"
+            "content": "<p>This was my group project for 11-785, a rather intense deep learning class at CMU that I recommend to everyone. Here's <a href=\"https://t7koivbovh.ufs.sh/f/sV8Imy5qB0jLcQ9oWp4A207xLCeUZtGQrWFkjmzDSNcq9Pf3\">a link to paper</a>, and the abstract below.</p><p>In the realm of AI and artistic applications, neural style transfer (NST) has emerged as a key technique for transforming the style of one image onto the content of another, enabling the creation of visually compelling, stylized images. Despite the potential, neural style transfer remains an under-explored area. This project explores adapting ALADIN—a model originally designed for capturing art style similarity—into a generative encoder-decoder based model for neural style transfer, thus testing the capability of using search embeddings to inform a generative model in the NST task.</p><p>ALADIN constructs style embeddings through representation learning techniques, capturing stylistic elements across various artworks. By re-purposing these embeddings for generative style transfer, we aim to provide a reasonable approach for style adaptation.</p>"
         },
         {
             "title": "Speculative Decoding",
@@ -129,7 +119,7 @@
             "priority": "10",
             "cover_image": "/pages/speculative-decoding.png",
             "slug": "speculative-decoding",
-            "content": "<p>This is the Speculative Decoding page content.</p>"
+            "content": "<p>This was my group project for CMU's GenAI course, an investigation into speculative decoding and low-resource coding languages. Here's a link <a href=\"https://t7koivbovh.ufs.sh/f/sV8Imy5qB0jLOl9GirAqjnWClu8S9fNbGFKvJH7RshxTyE4A\">to the paper</a>, and the abstract below.</p><p>As large language models have continued to grow in size, inference latency (as in time to generate a sequence) has become a bigger issue. Large models need to make many forward passes sequentially, resulting in high latency at inference time. Improvements in inference latency can significantly affect workflows, and having lower latency may result in faster systems and feedback loops. A recent proposal to address the issue of inference latency is Speculative Decoding, a method of using smaller models as a “drafter”, which can quickly generate a draft response, then allowing the larger model to serve as a “verifier” which can check multiple draft tokens in parallel. If the verifier accepts the drafter response often enough, this can result in significant speedup during inference. If the larger language model does not accept the smaller language model’s result, then the larger language model generates its own result fully. However, the hope is that the smaller language model and the larger language model will agree often, resulting in improved latency. In this project, we applied finetuning to Speculative Decoding to create a faster model for code generation. Specifically, we used The Stack, a large dataset of code files, to finetune the drafter model. We compared the performance of this finetuned model with that of a baseline model, and used this to answer a few research questions involving these models.</p>"
         },
         {
             "title": "Variational Clip",
@@ -139,7 +129,17 @@
             "priority": "11",
             "cover_image": "/pages/variational-clip.png",
             "slug": "variational-clip",
-            "content": "<p>This is the Variational Clip page content.</p>"
+            "content": "<p>This is my favorite and most successful project I've worked on.  Here's a link <a href=\"https://t7koivbovh.ufs.sh/f/sV8Imy5qB0jLlCfhMFSnvHf6eYD1rCkjOZxL7cEoF8IMqwVi\">to the paper</a>, and the abstract below.</p><p>CLIP (Contrastive Language-Image Pre-training) has revolutionized multimodal learning, but struggles with compositional out-of-distribution (C-OoD) generalization due to sparse, clustered embedding distributions. We propose Variational CLIP (V-CLIP), which reformulates CLIP within a variational inference framework using von Mises-Fisher distributions and KL divergence regularization to enforce a uniform hyperspherical prior. Through extensive baseline analysis of CLIP, CLOOB, and AlignCLIP, we demonstrate that embedding uniformity strongly correlates with compositional generalization. Our V-CLIP approach aims to balance semantic alignment with representational uniformity, improving performance on novel attribute-object combinations without sacrificing indistribution accuracy. Our best V-CLIP variant achieves 0.568 Top-1 retrieval accuracy on C-OoD, approaching CLIP(COOD)’s 0.610 without requiring explicit compositional fine-tuning, while successfully reducing the modality gap through appropriate KL regularization. However, we find that excessive uniformity pressure can collapse semantic structure, revealing a critical tradeoff between distribution uniformity and discriminative power.</p>"
+        },
+        {
+            "title": "CompCache",
+            "tags": [
+                "AI"
+            ],
+            "priority": "12",
+            "cover_image": "/pages/compcache.png",
+            "slug": "compcache",
+            "content": "<p>This was my group project for CMU's Advanced NLP course, a somewhat successful attempt to leverage document co-retrieval for improved TTFT for RAG systems. Here's a link <a href=\"https://t7koivbovh.ufs.sh/f/sV8Imy5qB0jLOwNHKfAqjnWClu8S9fNbGFKvJH7RshxTyE4A\">to the paper</a>, and the abstract below.</p><p>Retrieval-augmented generation (RAG) inference is dominated by prefill, and existing KV-cache reuse methods—prefix caching, full KV reuse, and selective recomputation (CacheBlend)—treat every query’s context as a novel composition, repeating the same crosschunk attention repair even when identical document combinations recur. Yet retrieval in deployed RAG systems is heavy-tailed: a smallset of document pairs accounts for a disproportionate share of traffic. We present CompCache, a composition-aware caching layer that promotes frequently co-retrieved pairs to precomputed joint KV caches, resolving within-pair cross-attention offline so online fusion only repairs across-group dependencies. A sparse-delta representation stores just the cross-attention correction, fitting ∼11× morepairs per byte. Across six QA benchmarks on Mistral-7B, CompCache reduces time-to-firsttoken by 22% over CacheBlend at 6% higher quality. Workload structure, we argue, is a complementary axis for KV-cache optimization.</p>"
         }
     ]
 }
