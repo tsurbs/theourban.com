@@ -151,6 +151,57 @@ async function saveUiSuccess(options: {
 	}
 }
 
+/** Cheap follow-up call: one-sentence toast copy for feedback/regenerate paths. */
+async function summarizeIterationChange(options: {
+	apiKey: string;
+	model: string;
+	feedbackHistory: string[];
+}): Promise<string | null> {
+	const { apiKey, model, feedbackHistory } = options;
+	if (feedbackHistory.length === 0) return null;
+
+	const latest = feedbackHistory[feedbackHistory.length - 1]?.trim() ?? '';
+	if (!latest) return null;
+
+	const earlier = feedbackHistory
+		.slice(0, -1)
+		.map((s) => s.trim())
+		.filter(Boolean);
+
+	try {
+		const result = await geminiGenerateContent({
+			apiKey,
+			model,
+			systemInstruction:
+				'You write one short sentence (max 16 words) summarizing a UI change for a toast. Past tense, plain language. No quotes, markdown, or preamble.',
+			messages: [
+				{
+					role: 'user',
+					content: earlier.length
+						? `Earlier feedback (context only): ${earlier.join(' | ')}\nLatest request just applied: ${latest}\nSummarize only the latest change.`
+						: `User feedback just applied: ${latest}\nSummarize what changed.`
+				}
+			],
+			generationConfig: {
+				temperature: 0.2,
+				maxOutputTokens: 48
+			}
+		});
+
+		const cleaned = result.text
+			.trim()
+			.replace(/^["'`]+|["'`]+$/g, '')
+			.replace(/\s+/g, ' ')
+			.slice(0, 160)
+			.trim();
+		return cleaned || null;
+	} catch (err) {
+		console.warn('changeSummary generation failed:', err);
+		// Soft fallback so the toast still has something useful
+		return latest.length > 120 ? `${latest.slice(0, 119)}…` : latest;
+	}
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const API_KEY = env.AISTUDIO_API_KEY;
 	const MODEL =
@@ -326,7 +377,20 @@ export const POST: RequestHandler = async ({ request }) => {
 					stats
 				});
 
-				send('done', { html: result.html, stats });
+				let changeSummary: string | null = null;
+				if (feedbackHistory.length > 0) {
+					changeSummary = await summarizeIterationChange({
+						apiKey: API_KEY,
+						model: MODEL,
+						feedbackHistory
+					});
+				}
+
+				send('done', {
+					html: result.html,
+					stats,
+					...(changeSummary ? { changeSummary } : {})
+				});
 				controller.close();
 			} catch (err) {
 				console.error('Error generating UI:', err);

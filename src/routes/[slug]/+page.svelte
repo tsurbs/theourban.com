@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { fade, fly } from "svelte/transition";
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import { siteState } from "$lib/siteState.svelte";
@@ -18,6 +19,7 @@
 
     const CONTEXT_MSG = "theourban-contextmenu";
     const PREVIEW_THROTTLE_MS = 1500;
+    const CHANGE_TOAST_MS = 4500;
 
     let { data }: { data: PageData } = $props();
 
@@ -35,6 +37,27 @@
     let nerdsModalOpen = $state(false);
     let nerdGlobal = $derived(data.nerdGlobal);
     let nerdsExpandedId = $state<string | null>(null);
+    let changeToast = $state("");
+    let changeToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function dismissChangeToast() {
+        changeToast = "";
+        if (changeToastTimer) {
+            clearTimeout(changeToastTimer);
+            changeToastTimer = null;
+        }
+    }
+
+    function showChangeToast(summary: string) {
+        const text = summary.trim();
+        if (!text) return;
+        if (changeToastTimer) clearTimeout(changeToastTimer);
+        changeToast = text;
+        changeToastTimer = setTimeout(() => {
+            changeToast = "";
+            changeToastTimer = null;
+        }, CHANGE_TOAST_MS);
+    }
 
     async function refreshNerdGlobalFromServer() {
         const slug = data.site.slug;
@@ -241,6 +264,14 @@
                         siteState.generatedHtml = payload.html;
                         siteState.hasGenerated = true;
                     }
+                    const history = data.site.feedbackHistory || [];
+                    if (
+                        history.length > 0 &&
+                        typeof payload.changeSummary === "string" &&
+                        payload.changeSummary.trim()
+                    ) {
+                        showChangeToast(payload.changeSummary);
+                    }
                     streamStage = "Done";
                 } else if (eventName === "error") {
                     throw new Error(
@@ -319,6 +350,7 @@
             if (e.key === "Escape") {
                 nerdsModalOpen = false;
                 contextMenuOpen = false;
+                dismissChangeToast();
             }
         }
         window.addEventListener("keydown", onKeydown);
@@ -388,6 +420,7 @@
         return () => {
             window.removeEventListener("message", onIframeContextMenuMsg);
             window.removeEventListener("keydown", onKeydown);
+            if (changeToastTimer) clearTimeout(changeToastTimer);
         };
     });
 
@@ -517,6 +550,28 @@
             <div class="inline-error" role="alert">
                 <span>{error}</span>
                 <button type="button" onclick={() => runGeneration()}>Retry</button>
+            </div>
+        {/if}
+
+        {#if changeToast}
+            <div class="change-toast-wrap">
+                <div
+                    class="change-toast"
+                    role="status"
+                    aria-live="polite"
+                    in:fly={{ y: 12, duration: 280 }}
+                    out:fade={{ duration: 200 }}
+                >
+                    <span class="change-toast-text">{changeToast}</span>
+                    <button
+                        type="button"
+                        class="icon-btn change-toast-dismiss"
+                        onclick={dismissChangeToast}
+                        aria-label="Dismiss"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
             </div>
         {/if}
 
@@ -962,6 +1017,49 @@
         color: #991b1b;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
             sans-serif;
+    }
+
+    .change-toast-wrap {
+        position: fixed;
+        bottom: 28px;
+        left: 0;
+        right: 0;
+        z-index: 10048;
+        display: flex;
+        justify-content: center;
+        padding: 0 12px;
+        pointer-events: none;
+    }
+
+    .change-toast {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: min(420px, 100%);
+        padding: 10px 8px 10px 16px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 999px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        pointer-events: auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            sans-serif;
+    }
+
+    .change-toast-text {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        line-height: 1.35;
+        color: #444;
+    }
+
+    .change-toast-dismiss {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        color: #888;
     }
 
     .inline-error button {
