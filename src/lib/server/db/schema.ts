@@ -1,4 +1,5 @@
 import {
+	boolean,
 	index,
 	integer,
 	jsonb,
@@ -24,6 +25,17 @@ export const site = pgTable('site', {
 	thumbsUps: integer('thumbs_ups').default(0).notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+/** Layout archetypes for generative variety; seeds in code + weekly cron rows. */
+export const designArchetype = pgTable('design_archetype', {
+	key: text('key').primaryKey(),
+	label: text('label').notNull(),
+	description: text('description').notNull(),
+	active: boolean('active').default(true).notNull(),
+	source: text('source').notNull(), // 'seed' | 'cron'
+	model: text('model'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 });
 
 /** One row per Gemini call; aggregated per `site_slug` across all visitors. */

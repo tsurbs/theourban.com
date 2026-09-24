@@ -1,5 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { siteState } from "$lib/siteState.svelte";
     import type { GenerationCallStats } from "$lib/generationStats";
     import type { PageData } from "./$types";
@@ -8,15 +10,22 @@
     import X from "lucide-svelte/icons/x";
     import LayoutGrid from "lucide-svelte/icons/layout-grid";
     import ThumbsUp from "lucide-svelte/icons/thumbs-up";
+    import Shuffle from "lucide-svelte/icons/shuffle";
     import { enhance } from "$app/forms";
     import { ensurePreviewContentSecurityPolicy } from "$lib/previewSecurity";
+    import { previewPartialHtml } from "$lib/htmlPreview";
+    import { SvelteURLSearchParams } from "svelte/reactivity";
 
     const CONTEXT_MSG = "theourban-contextmenu";
+    const PREVIEW_THROTTLE_MS = 1500;
 
     let { data }: { data: PageData } = $props();
 
     let loading = $state(true); // Always true initially until we handle mount logic
     let error = $state("");
+    let streamStage = $state("Preparing…");
+    let streamBytes = $state(0);
+    let streamPreviewHtml = $state("");
     let feedbackInput = $state("");
     let barCollapsed = $state(false);
     let votedSlugs = $state<string[]>([]);
@@ -24,12 +33,8 @@
     let contextMenuX = $state(0);
     let contextMenuY = $state(0);
     let nerdsModalOpen = $state(false);
-    let nerdGlobal = $state<SiteNerdGlobalPayload>(data.nerdGlobal);
+    let nerdGlobal = $derived(data.nerdGlobal);
     let nerdsExpandedId = $state<string | null>(null);
-
-    $effect(() => {
-        nerdGlobal = data.nerdGlobal;
-    });
 
     async function refreshNerdGlobalFromServer() {
         const slug = data.site.slug;
@@ -130,11 +135,37 @@
         void refreshNerdGlobalFromServer();
     }
 
+    function remixCurrentTheme() {
+        contextMenuOpen = false;
+        const layout =
+            data.site.styleGuide &&
+            typeof data.site.styleGuide === "object" &&
+            "layoutArchetype" in (data.site.styleGuide as object)
+                ? String(
+                      (data.site.styleGuide as { layoutArchetype?: string })
+                          .layoutArchetype || "",
+                  )
+                : "";
+        const qs = new SvelteURLSearchParams();
+        if (data.site.themeWords) qs.set("theme", data.site.themeWords);
+        if (layout) qs.set("layout", layout);
+        const q = qs.toString();
+        // Query string must be appended after resolve(); rule does not accept template forms.
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve('/new') + query
+        void goto(q ? `${resolve("/new")}?${q}` : resolve("/new"));
+    }
+
     async function runGeneration() {
         const abortController = new AbortController();
+        const previousHtml = siteState.generatedHtml || data.site.generatedHtml || "";
         try {
             loading = true;
             error = "";
+            streamStage = "Connecting to model…";
+            streamBytes = 0;
+            streamPreviewHtml = "";
+            let accumulated = "";
+            let lastPreviewAt = 0;
 
             const uiRes = await fetch("/api/generate-ui", {
                 method: "POST",
@@ -143,34 +174,112 @@
                     slug: data.site.slug,
                     styleGuide: data.site.styleGuide,
                     feedbackHistory: data.site.feedbackHistory,
-                    oldHtml: siteState.generatedHtml || data.site.generatedHtml,
+                    oldHtml: previousHtml,
                 }),
                 signal: abortController.signal,
             });
 
-            if (!uiRes.ok) {
+            if (!uiRes.ok || !uiRes.body) {
                 const errData = await uiRes.json().catch(() => ({}));
                 throw new Error(
                     errData.error || `UI API returned ${uiRes.status}`,
                 );
             }
 
-            const uiData = await uiRes.json();
-            if (uiData.error) throw new Error(uiData.error);
+            const reader = uiRes.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let gotDone = false;
 
-            if (uiData.stats) {
-                siteState.generationStats.ui = uiData.stats;
+            const handleSseBlock = (block: string) => {
+                const lines = block.split("\n");
+                let eventName = "message";
+                const dataLines: string[] = [];
+                for (const line of lines) {
+                    if (line.startsWith("event:")) {
+                        eventName = line.slice(6).trim();
+                    } else if (line.startsWith("data:")) {
+                        dataLines.push(line.slice(5).trimStart());
+                    }
+                }
+                if (dataLines.length === 0) return;
+                let payload: Record<string, unknown>;
+                try {
+                    payload = JSON.parse(dataLines.join("\n")) as Record<
+                        string,
+                        unknown
+                    >;
+                } catch {
+                    return;
+                }
+
+                if (eventName === "chunk") {
+                    const text =
+                        typeof payload.text === "string" ? payload.text : "";
+                    if (payload.stage === "repair") {
+                        streamStage = "Repairing output…";
+                        accumulated = "";
+                    } else if (text) {
+                        accumulated += text;
+                        streamBytes = new TextEncoder().encode(
+                            accumulated,
+                        ).length;
+                        streamStage = `Building… ~${(streamBytes / 1024).toFixed(1)} KB`;
+                        const now = Date.now();
+                        if (now - lastPreviewAt >= PREVIEW_THROTTLE_MS) {
+                            lastPreviewAt = now;
+                            streamPreviewHtml = previewPartialHtml(accumulated);
+                        }
+                    }
+                } else if (eventName === "done") {
+                    gotDone = true;
+                    if (payload.stats) {
+                        siteState.generationStats.ui =
+                            payload.stats as GenerationCallStats;
+                    }
+                    if (typeof payload.html === "string") {
+                        siteState.generatedHtml = payload.html;
+                        siteState.hasGenerated = true;
+                    }
+                    streamStage = "Done";
+                } else if (eventName === "error") {
+                    throw new Error(
+                        (payload.error as string) || "Failed to generate UI",
+                    );
+                }
+            };
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                let sep: number;
+                while ((sep = buffer.indexOf("\n\n")) !== -1) {
+                    const block = buffer.slice(0, sep);
+                    buffer = buffer.slice(sep + 2);
+                    handleSseBlock(block);
+                }
+            }
+            if (buffer.trim()) handleSseBlock(buffer);
+
+            if (!gotDone) {
+                throw new Error("Stream ended without a completed site");
             }
 
-            siteState.generatedHtml = uiData.html;
-            siteState.hasGenerated = true;
             loading = false;
+            streamPreviewHtml = "";
             await refreshNerdGlobalFromServer();
         } catch (err) {
             if ((err as Error).name === "AbortError") return;
             console.error("Error in generation flow:", err);
             error = (err as Error).message || "Failed to generate UI";
+            // Keep prior HTML live when available
+            if (previousHtml) {
+                siteState.generatedHtml = previousHtml;
+                siteState.hasGenerated = true;
+            }
             loading = false;
+            streamPreviewHtml = "";
         }
     }
 
@@ -236,6 +345,7 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             themeWords: data.site.themeWords,
+                            bootstrap: true,
                         }),
                     });
 
@@ -338,11 +448,27 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="site-takeover" oncontextmenu={handleRootContextMenu}>
     {#if loading}
-        <div class="loader-overlay">
-            <h2>Designing site structure...</h2>
-            <div class="spinner"></div>
+        <div class="loader-overlay" class:with-preview={!!streamPreviewHtml}>
+            <div class="loader-panel">
+                <h2>{streamStage}</h2>
+                <div class="spinner"></div>
+                {#if streamBytes > 0}
+                    <p class="loader-meta">
+                        {(streamBytes / 1024).toFixed(1)} KB received
+                    </p>
+                {/if}
+            </div>
+            {#if streamPreviewHtml}
+                <iframe
+                    class="stream-preview"
+                    srcdoc={streamPreviewHtml}
+                    title="Building preview"
+                    sandbox=""
+                    referrerpolicy="no-referrer"
+                ></iframe>
+            {/if}
         </div>
-    {:else if error}
+    {:else if error && !siteState.generatedHtml}
         <div class="error-overlay">
             <div class="error-card">
                 <h2>Error Generating UI</h2>
@@ -387,6 +513,13 @@
             </div>
         {/if}
 
+        {#if error}
+            <div class="inline-error" role="alert">
+                <span>{error}</span>
+                <button type="button" onclick={() => runGeneration()}>Retry</button>
+            </div>
+        {/if}
+
         <div class="fab-container">
             {#if barCollapsed}
                 <button
@@ -397,9 +530,18 @@
                     <Wand2 size={24} />
                 </button>
             {/if}
+            <button
+                type="button"
+                class="magic-fab secondary"
+                onclick={remixCurrentTheme}
+                aria-label="Remix this theme"
+                title="Remix this theme"
+            >
+                <Shuffle size={22} />
+            </button>
             <!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
             <a
-                href="/gallery"
+                href={resolve("/gallery")}
                 class="magic-fab secondary"
                 aria-label="Go to Gallery"
             >
@@ -461,6 +603,9 @@
         >
             <button type="button" role="menuitem" onclick={openNerdsModal}>
                 Stats for nerds
+            </button>
+            <button type="button" role="menuitem" onclick={remixCurrentTheme}>
+                Remix theme
             </button>
         </div>
     {/if}
@@ -752,12 +897,84 @@
         z-index: 100;
     }
 
+    .loader-overlay.with-preview {
+        justify-content: flex-start;
+        padding-top: 24px;
+        background: #f4f4f5;
+    }
+
+    .loader-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        z-index: 2;
+        padding: 12px 18px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    }
+
     .loader-overlay h2 {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
             sans-serif;
         font-weight: 500;
         color: #333;
         margin: 0;
+        font-size: 1rem;
+    }
+
+    .loader-meta {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #666;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .stream-preview {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        opacity: 0.55;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .inline-error {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10052;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: min(520px, calc(100vw - 24px));
+        padding: 10px 12px 10px 16px;
+        background: #fff5f5;
+        border: 1px solid #fecaca;
+        border-radius: 999px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        font-size: 13px;
+        color: #991b1b;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            sans-serif;
+    }
+
+    .inline-error button {
+        flex-shrink: 0;
+        padding: 6px 14px;
+        border: none;
+        border-radius: 999px;
+        background: #dc2626;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
     }
 
     .spinner {

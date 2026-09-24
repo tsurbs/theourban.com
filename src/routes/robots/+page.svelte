@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 	import content from "$lib/assets/content.json";
+	import { resolve } from "$app/paths";
 
 	let { data }: { data: PageData } = $props();
 
@@ -120,6 +121,8 @@
 		<ul>
 			{#each content.links as link (link.url)}
 				<li>
+					<!-- External absolute URLs (mailto / https) — not app routes -->
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 					<a href={link.url}>{link.name}</a>
 					<span class="muted"> — {link.url}</span>
 				</li>
@@ -131,13 +134,13 @@
 		<h2 id="site-heading">Human-facing site entry points</h2>
 		<ul>
 			<li>
-				<a href={`${origin}/${data.defaultSiteSlug}`}>Home portfolio</a> — `/` redirects to this slug; content is served from the database like other pages.
+				<a href={resolve(`/${data.defaultSiteSlug}`)}>Home portfolio</a> — `/` redirects to this slug; content is served from the database like other pages.
 			</li>
 			<li>
-				<a href={`${origin}/new`}>Roll a new random theme</a> — invokes the Gemini style + UI pipeline (new slug).
+				<a href={resolve("/new")}>Roll a new random theme</a> — invokes the Gemini style + UI pipeline (new slug).
 			</li>
 			<li>
-				<a href={`${origin}/gallery`}>Gallery</a> — community thumbs-up on generated themes.
+				<a href={resolve("/gallery")}>Gallery</a> — community thumbs-up on generated themes.
 			</li>
 		</ul>
 	</section>

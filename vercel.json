@@ -1,4 +1,10 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "npm run build:vercel"
+	"buildCommand": "npm run build:vercel",
+	"crons": [
+		{
+			"path": "/api/cron/refresh-archetypes",
+			"schedule": "0 0 * * 0"
+		}
+	]
 }
